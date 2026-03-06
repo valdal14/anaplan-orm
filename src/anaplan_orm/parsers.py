@@ -16,7 +16,7 @@ class XMLStringParser:
             raise TypeError("No Root Element found")
             
         for row in payload:
-            xml_dic = {}  # <-- Moved INSIDE the loop! Brand new dict per row.
+            xml_dic = {}
             for child in row:
                 xml_dic[child.tag] = child.text
             xml_elements.append(xml_dic)
