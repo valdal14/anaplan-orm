@@ -1,6 +1,16 @@
+from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
 
-class XMLStringParser:
+class DataParser(ABC):
+    """
+    The abstract interface that all Anaplan ORM parsers must implement.
+    """
+    @abstractmethod
+    def parse(self, payload: str) -> list[dict]:
+        """Parses a string payload into a list of dictionaries."""
+        pass
+
+class XMLStringParser(DataParser):
     
     @classmethod
     def parse(cls, xml_str_payload: str) -> list[dict]:
