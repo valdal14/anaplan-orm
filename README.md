@@ -1,4 +1,9 @@
 # anaplan-orm
+
+![CI Pipeline](https://github.com/valdal14/anaplan-orm/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat&logo=python)
+![License](https://img.shields.io/badge/License-MIT-green)
+
 A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).
 
 ## Current Status
