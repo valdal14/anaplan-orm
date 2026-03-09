@@ -121,7 +121,42 @@ class AnaplanClient:
         except httpx.HTTPError as e:
             # Catch HTTPError to handle both network drops and 4xx/5xx responses
             raise AnaplanConnectionError(f"Failed to upload file to Anaplan: {str(e)}") from e
-        
+
+    def execute_import(self, workspace_id: str, model_id: str, import_id: str) -> str:
+        """
+        Execute an Anaplan import process after a CSV file has been successfully uploaded.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            import_id: Anaplan's destination process import id as string
+
+        Returns:
+            str: The Anaplan Task ID generated for this asynchronous import.
+
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
+        """
+        headers = self.authenticator.get_auth_headers()
+        headers["Content-Type"] = "application/json"
+
+        url_path = self.import_url_builder(workspace_id, model_id, import_id)
+
+        try:
+            response = self.http_client.post(
+                url_path, 
+                headers=headers, 
+                json={"localeName": "en_US"}
+            )
+            response.raise_for_status()
+
+            print(response) # REMOVE AFTER TEST
+            return response.json()["task"]["taskId"]
+            
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(f"Failed to execute import process in Anaplan: {str(e)}") from e
+
+    # Helper Methods ##########################################################################
     def url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
         """
         Constructs the specific endpoint path for an Anaplan file.
@@ -136,3 +171,17 @@ class AnaplanClient:
         """
         # Notice the 'f' at the start of the string!
         return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}"
+    
+    def import_url_builder(self, workspace_id: str, model_id: str, import_id: str) -> str:
+        """
+        Constructs the specific endpoint path for an Anaplan import action.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            import_id: Anaplan's destination process import id as string
+            
+        Returns:
+            str: The constructed Anaplan URL path.
+        """
+        return f"/workspaces/{workspace_id}/models/{model_id}/imports/{import_id}/tasks"

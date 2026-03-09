@@ -91,3 +91,54 @@ def test_upload_file_raises_custom_error():
             client.upload_file("w", "m", "f", "data")
             
         assert "Failed to upload file to Anaplan" in str(exc_info.value)
+
+def test_execute_import_success():
+    """Test that the client correctly formats the URL, headers, and JSON payload for an import."""
+    auth = DummyAuthenticator()
+    client = AnaplanClient(authenticator=auth)
+    
+    # Arrange: Setup dummy data
+    workspace_id = "ws_123"
+    model_id = "mod_456"
+    import_id = "imp_789"
+    
+    # Act: Hijack the httpx 'post' method
+    with patch.object(httpx.Client, 'post') as mock_post:
+        # Create a fake successful HTTP response returning a mock Task ID
+        fake_response = Mock()
+        fake_response.raise_for_status.return_value = None
+        fake_response.json.return_value = {"task": {"taskId": "task_abc123"}}
+        mock_post.return_value = fake_response
+        
+        # Execute our method
+        result_task_id = client.execute_import(workspace_id, model_id, import_id)
+        
+        # 3. Assert: Verify the method returned the exact string from the JSON
+        assert result_task_id == "task_abc123"
+        
+        # Verify httpx.post was called with the correct payload and headers
+        expected_url = f"/workspaces/{workspace_id}/models/{model_id}/imports/{import_id}/tasks"
+        expected_headers = {
+            "Authorization": "AnaplanAuthToken FakeTestToken",
+            "Content-Type": "application/json"
+        }
+        
+        mock_post.assert_called_once_with(
+            expected_url,
+            headers=expected_headers,
+            json={"localeName": "en_US"}
+        )
+
+def test_execute_import_raises_custom_error():
+    """Test that failed imports raise our custom AnaplanConnectionError."""
+    auth = DummyAuthenticator()
+    client = AnaplanClient(authenticator=auth)
+    
+    with patch.object(httpx.Client, 'post') as mock_post:
+        # Force httpx to simulate a 400 Bad Request or 500 Server Error
+        mock_post.side_effect = httpx.HTTPError("400 Client Error: Bad Request for url")
+        
+        with pytest.raises(AnaplanConnectionError) as exc_info:
+            client.execute_import("w", "m", "i")
+            
+        assert "Failed to execute import process in Anaplan" in str(exc_info.value)
