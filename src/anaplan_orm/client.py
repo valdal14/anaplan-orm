@@ -18,6 +18,45 @@ class Authenticator(ABC):
         """
         pass
 
+class BasicAuthenticator(Authenticator):
+    AUTH_URL = "https://auth.anaplan.com/token/authenticate"
+
+    def __init__(self, email: str, pwd: str, verify_ssl: bool = True):
+        self.email = email
+        self.pwd = pwd
+        self.verify_ssl = verify_ssl
+
+    def get_auth_headers(self) -> dict:
+        try:
+            response = httpx.post(
+                self.AUTH_URL, 
+                auth=(self.email, self.pwd),
+                verify=self.verify_ssl
+            )
+                       
+            response.raise_for_status()
+            json_payload = response.json()
+            
+            if json_payload.get("status") != "SUCCESS":
+                err_msg = json_payload.get("statusMessage", "Unknown Error")
+                raise AnaplanConnectionError(f"Anaplan Auth Failed. Status: {json_payload.get('status')} - {err_msg}")
+            
+            # Extract the actual token string
+            # print(json_payload)
+            # print(json_payload["status"])
+            # print(json_payload["tokenInfo"]["expiresAt"])
+            # print(json_payload["tokenInfo"]["tokenValue"])
+            # print(json_payload["tokenInfo"]["refreshTokenId"])
+            token_value = json_payload["tokenInfo"]["tokenValue"]
+            
+            return {
+                "Authorization": f"AnaplanAuthToken {token_value}",
+                "Content-Type": "application/json"
+            }
+            
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(f"Authentication failed: {str(e)}") from e
+
 
 class AnaplanClient:
     """

@@ -1,15 +1,16 @@
 from anaplan_orm.client import AnaplanClient, Authenticator
+from anaplan_orm.client import BasicAuthenticator
 from anaplan_orm.exceptions import AnaplanConnectionError
 
-class DummyAuthenticator(Authenticator):
-    def get_auth_headers(self) -> dict:
-        print("--> Authenticator called: Generating fake headers...")
-        return {"Authorization": "AnaplanAuthToken ThisIsAFakeToken123"}
-
+# Basic Auth Playground
 print("--> Initializing AnaplanClient...")
-mock_auth = DummyAuthenticator()
-client = AnaplanClient(authenticator=mock_auth, verify_ssl=False)
+basic_auth = BasicAuthenticator(
+    email="xxxxxx@xxxxx.com", # change with your Anaplan's account username
+    pwd="xxxxxxx", # change with your Anaplan's account password
+    verify_ssl=False
+)
 
+client = AnaplanClient(authenticator=basic_auth, verify_ssl=False)
 print("--> Pinging Anaplan API...")
 
 try:
