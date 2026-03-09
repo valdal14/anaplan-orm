@@ -6,8 +6,8 @@ def ping_anaplan():
     # Basic Auth Playground
     print("--> Initializing AnaplanClient...")
     basic_auth = BasicAuthenticator(
-        email="win-anaplan@canda.com", # change with your Anaplan's account username
-        pwd="ApTb2343", # change with your Anaplan's account password
+        email="xxxx@xxxx.xxx", # change with your Anaplan's account username
+        pwd="xxxxxxx", # change with your Anaplan's account password
         verify_ssl=False
     )
 
