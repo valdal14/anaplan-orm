@@ -57,7 +57,6 @@ class BasicAuthenticator(Authenticator):
         except httpx.HTTPError as e:
             raise AnaplanConnectionError(f"Authentication failed: {str(e)}") from e
 
-
 class AnaplanClient:
     """
     The core client for interacting with the Anaplan REST API.
@@ -91,3 +90,49 @@ class AnaplanClient:
             return response.status_code
         except httpx.RequestError as e:
             raise AnaplanConnectionError(f"Network error communicating with Anaplan: {str(e)}") from e
+    
+    def upload_file(self, workspace_id: str, model_id: str, file_id: str, csv_data: str):
+        """
+        Uploads a CSV string to an Anaplan data hub file placeholder.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            file_id: Anaplan's destination file id as string
+            csv_data: The fully formatted CSV string to upload
+
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the upload.
+        """
+        headers = self.authenticator.get_auth_headers()
+        headers["Content-Type"] = "application/octet-stream"
+        
+        url_path = self.url_builder(workspace_id, model_id, file_id)
+        
+        try:
+            # We must pass the csv_data encoded as bytes to the 'content' parameter
+            response = self.http_client.put(
+                url_path, 
+                headers=headers, 
+                content=csv_data.encode('utf-8')
+            )
+            response.raise_for_status()
+            
+        except httpx.HTTPError as e:
+            # Catch HTTPError to handle both network drops and 4xx/5xx responses
+            raise AnaplanConnectionError(f"Failed to upload file to Anaplan: {str(e)}") from e
+        
+    def url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
+        """
+        Constructs the specific endpoint path for an Anaplan file.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            file_id: Anaplan's destination file id as string
+            
+        Returns:
+            str: The constructed Anaplan URL path.
+        """
+        # Notice the 'f' at the start of the string!
+        return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}"
