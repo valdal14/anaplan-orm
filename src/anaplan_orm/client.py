@@ -61,21 +61,29 @@ class AnaplanClient:
     """
     The core client for interacting with the Anaplan REST API.
     """
-    
+
     # Anaplan's base API URL
     BASE_URL = "https://api.anaplan.com/2/0"
     
-    def __init__(self, authenticator: Authenticator, verify_ssl: bool = True):
+    def __init__(self, authenticator: Authenticator, verify_ssl: bool = True, timeout: float = 30.0):
         """
         Initializes the Anaplan client with a specific authentication strategy.
         
         Args:
             authenticator (Authenticator): An instance of a class that implements 
                 the Authenticator interface.
+            
+            verify_ssl: Default to True, used to bypass your corporate proxy if needed
+
+            timeout: change default 5.0 httpx default timeout
         """
         self.authenticator = authenticator
         # Create a reusable HTTP session for performance
-        self.http_client = httpx.Client(base_url=self.BASE_URL, verify=verify_ssl)
+        self.http_client = httpx.Client(
+            base_url=self.BASE_URL, 
+            verify=verify_ssl,
+            timeout=timeout
+        )
 
     def ping(self) -> int:
         """
@@ -122,14 +130,14 @@ class AnaplanClient:
             # Catch HTTPError to handle both network drops and 4xx/5xx responses
             raise AnaplanConnectionError(f"Failed to upload file to Anaplan: {str(e)}") from e
 
-    def execute_import(self, workspace_id: str, model_id: str, import_id: str) -> str:
+    def execute_process(self, workspace_id: str, model_id: str, process_id: str) -> str:
         """
         Execute an Anaplan import process after a CSV file has been successfully uploaded.
 
         Args:
             workspace_id: Anaplan's workspace id as string
             model_id: Anaplan's destination model id as string
-            import_id: Anaplan's destination process import id as string
+            process_id: Anaplan's destination process id as string
 
         Returns:
             str: The Anaplan Task ID generated for this asynchronous import.
@@ -140,7 +148,7 @@ class AnaplanClient:
         headers = self.authenticator.get_auth_headers()
         headers["Content-Type"] = "application/json"
 
-        url_path = self.import_url_builder(workspace_id, model_id, import_id)
+        url_path = self.process_url_builder(workspace_id, model_id, process_id)
 
         try:
             response = self.http_client.post(
@@ -150,11 +158,10 @@ class AnaplanClient:
             )
             response.raise_for_status()
 
-            print(response) # REMOVE AFTER TEST
             return response.json()["task"]["taskId"]
             
         except httpx.HTTPError as e:
-            raise AnaplanConnectionError(f"Failed to execute import process in Anaplan: {str(e)}") from e
+            raise AnaplanConnectionError(f"Failed to execute process in Anaplan: {str(e)}") from e
 
     # Helper Methods ##########################################################################
     def url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
@@ -172,16 +179,16 @@ class AnaplanClient:
         # Notice the 'f' at the start of the string!
         return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}"
     
-    def import_url_builder(self, workspace_id: str, model_id: str, import_id: str) -> str:
+    def process_url_builder(self, workspace_id: str, model_id: str, process_id: str) -> str:
         """
-        Constructs the specific endpoint path for an Anaplan import action.
+        Constructs the specific endpoint path for an Anaplan process action.
 
         Args:
             workspace_id: Anaplan's workspace id as string
             model_id: Anaplan's destination model id as string
-            import_id: Anaplan's destination process import id as string
+            process_id: Anaplan's destination process id as string
             
         Returns:
             str: The constructed Anaplan URL path.
         """
-        return f"/workspaces/{workspace_id}/models/{model_id}/imports/{import_id}/tasks"
+        return f"/workspaces/{workspace_id}/models/{model_id}/processes/{process_id}/tasks"
