@@ -40,8 +40,6 @@ class Developer(AnaplanModel):
 Use the XMLStringParser to ingest your XML string payload, then use the AnaplanClient to stream the chunked data to Anaplan.
 
 ```python
-import os
-import json
 from anaplan_orm.parsers import XMLStringParser
 from anaplan_orm.client import AnaplanClient, BasicAuthenticator
 
