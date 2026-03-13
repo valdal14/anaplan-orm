@@ -237,15 +237,16 @@ def test_wait_for_process_completion_recursive_success():
         # It should have slept exactly once
         assert mock_sleep.call_count == 1
 
-def test_wait_for_process_completion_blocks_high_retries():
-    """Test that the safeguard prevents users from setting retry > 5."""
+def test_wait_for_process_completion_times_out():
+    """Test that the script raises a connection error when it runs out of retries."""
     auth = get_basic_authenticator()
     client = AnaplanClient(authenticator=auth)
     
-    with pytest.raises(ValueError) as exc_info:
-        client.wait_for_process_completion("w", "m", "p", "t", retry=6)
+    with pytest.raises(AnaplanConnectionError) as exc_info:
+        # We pass retry=0 to instantly trigger the timeout base case
+        client.wait_for_process_completion("w", "m", "p", "t", retry=0)
         
-    assert "maximum allowed retries for this recursive method is 5" in str(exc_info.value)
+    assert "did not complete within the assigned time" in str(exc_info.value)
 
 def test_authenticator_caches_token_successfully():
     """Test that rapid consecutive calls only hit the Anaplan API once."""
