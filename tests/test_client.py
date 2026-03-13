@@ -222,7 +222,7 @@ def test_wait_for_process_completion_recursive_success():
     client = AnaplanClient(authenticator=auth)
     
     with patch.object(client, '_get_process_task_status') as mock_status, \
-         patch.object(client, 'process_to_sleep') as mock_sleep:
+         patch.object(client, '_process_to_sleep') as mock_sleep:
         
         # Mock Anaplan returning IN_PROGRESS on the first try, then COMPLETE on the second
         mock_status.side_effect = [
@@ -304,6 +304,84 @@ def test_authenticator_refreshes_expired_token():
         
         # Ensure it realized the cache expired and made a SECOND network request
         assert mock_post.call_count == 2
+
+def test_upload_file_chunked_success_single_chunk():
+    """Test that a small file correctly triggers the 3-step chunked process exactly once."""
+    auth = get_basic_authenticator()
+    client = AnaplanClient(authenticator=auth)
+    
+    workspace_id = "ws_1"
+    model_id = "mod_1"
+    file_id = "file_1"
+    csv_payload = "EmployeeID,Salary\n101,75000"
+    
+    with patch.object(httpx.Client, 'post') as mock_post, \
+         patch.object(httpx.Client, 'put') as mock_put:
+             
+        # Setup fake successful responses
+        fake_response = Mock()
+        fake_response.raise_for_status.return_value = None
+        mock_post.return_value = fake_response
+        mock_put.return_value = fake_response
+        
+        # Act
+        client.upload_file_chunked(workspace_id, model_id, file_id, csv_payload, chunk_size_mb=1)
+        
+        # Assert: POST should be called twice (Init and Complete)
+        assert mock_post.call_count == 2
+        # Assert: PUT should be called exactly once for this tiny string
+        assert mock_put.call_count == 1
+        
+        # Verify the Init POST payload
+        mock_post.assert_any_call(
+            f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}",
+            headers={"Authorization": "AnaplanAuthToken FakeTestToken", "Content-Type": "application/json"},
+            json={"chunkCount": -1}
+        )
+
+def test_upload_file_chunked_multiple_chunks():
+    """Test that a large file is sliced into the correct number of chunks."""
+    auth = get_basic_authenticator()
+    client = AnaplanClient(authenticator=auth)
+    
+    # Create a fake string that is exactly 2.5 MB in size
+    # 1 MB = 1048576 bytes. 2.5 MB = 2621440 bytes
+    large_csv_payload = "A" * 2621440 
+    
+    with patch.object(httpx.Client, 'post') as mock_post, \
+         patch.object(httpx.Client, 'put') as mock_put:
+             
+        fake_response = Mock()
+        fake_response.raise_for_status.return_value = None
+        mock_post.return_value = fake_response
+        mock_put.return_value = fake_response
+        
+        # Act: Request 1 MB chunks for a 2.5 MB file
+        client.upload_file_chunked("w", "m", "f", large_csv_payload, chunk_size_mb=1)
+        
+        # Assert: It should take exactly 3 chunks (1MB, 1MB, 0.5MB)
+        assert mock_put.call_count == 3
+        
+        # Assert: Ensure chunk 0, 1, and 2 were called in the URLs
+        put_calls = mock_put.call_args_list
+        # Inspecting the first positional argument (URL) of the first call
+        assert "chunks/0" in put_calls[0][0][0] 
+        assert "chunks/1" in put_calls[1][0][0]
+        assert "chunks/2" in put_calls[2][0][0]
+
+def test_upload_file_chunked_raises_custom_error():
+    """Test that network failures during the chunked upload raise AnaplanConnectionError."""
+    auth = get_basic_authenticator()
+    client = AnaplanClient(authenticator=auth)
+    
+    with patch.object(httpx.Client, 'post') as mock_post:
+        # Force the initialization to fail
+        mock_post.side_effect = httpx.HTTPError("500 Server Error")
+        
+        with pytest.raises(AnaplanConnectionError) as exc_info:
+            client.upload_file_chunked("w", "m", "f", "data")
+            
+        assert "Failed during chunked upload process" in str(exc_info.value)
 
 # NOTE: Helpers Methods
 def get_basic_authenticator(is_mocked_authenticator: bool = True) -> Authenticator:

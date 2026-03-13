@@ -2,12 +2,13 @@ import httpx
 import time
 from abc import ABC, abstractmethod
 from anaplan_orm.exceptions import AnaplanConnectionError
+import logging
+logger = logging.getLogger(__name__)
 
 class Authenticator(ABC):
     """
     Abstract interface for Anaplan Authentication strategies.
     """
-    
     @abstractmethod
     def get_auth_headers(self) -> dict:
         """
@@ -50,11 +51,6 @@ class BasicAuthenticator(Authenticator):
             if json_payload.get("status") != "SUCCESS":
                 err_msg = json_payload.get("statusMessage", "Unknown Error")
                 raise AnaplanConnectionError(f"Anaplan Auth Failed. Status: {json_payload.get('status')} - {err_msg}")
-            
-            # NOTE: Not removing the following comments for now since later
-            # on I need to get extra values from the returned dic.
-            # print(json_payload["tokenInfo"]["expiresAt"])
-            # print(json_payload["tokenInfo"]["refreshTokenId"])
             
             # Save the new token
             self._cached_token = json_payload["tokenInfo"]["tokenValue"]
@@ -118,7 +114,7 @@ class AnaplanClient:
         except httpx.RequestError as e:
             raise AnaplanConnectionError(f"Network error communicating with Anaplan: {str(e)}") from e
     
-    def upload_file(self, workspace_id: str, model_id: str, file_id: str, csv_data: str):
+    def upload_file(self, workspace_id: str, model_id: str, file_id: str, csv_data: str) -> None:
         """
         Uploads a CSV string to an Anaplan data hub file placeholder.
 
@@ -134,7 +130,7 @@ class AnaplanClient:
         headers = self.authenticator.get_auth_headers()
         headers["Content-Type"] = "application/octet-stream"
         
-        url_path = self.url_builder(workspace_id, model_id, file_id)
+        url_path = self._upload_file_url_builder(workspace_id, model_id, file_id)
         
         try:
             # We must pass the csv_data encoded as bytes to the 'content' parameter
@@ -166,7 +162,7 @@ class AnaplanClient:
         headers = self.authenticator.get_auth_headers()
         headers["Content-Type"] = "application/json"
 
-        url_path = self.process_url_builder(workspace_id, model_id, process_id)
+        url_path = self._process_url_builder(workspace_id, model_id, process_id)
 
         try:
             response = self.http_client.post(
@@ -253,7 +249,7 @@ class AnaplanClient:
 
         # Evaluate if it is still working
         if task_state in ["IN_PROGRESS", "NOT_STARTED"]:
-            self.process_to_sleep(poll_interval)
+            self._process_to_sleep(poll_interval)
             return self.wait_for_process_completion(
                 workspace_id, 
                 model_id, 
@@ -266,14 +262,82 @@ class AnaplanClient:
         # Evaluate if it was cancelled by an admin or hit an unknown state
         raise AnaplanConnectionError(f"Process execution halted. Final state: {task_state}")
             
-    def process_to_sleep(self, t: int):
+    def _process_to_sleep(self, t: int) -> None:
         """Helper method to manage polling intervals by pausing script execution."""
         for _ in range(t):
             time.sleep(1)
 
+    def upload_file_chunked(self, workspace_id: str, model_id: str, file_id: str, csv_data: str, chunk_size_mb: int = 10) -> None:
+            """ 
+            Uploads a large CSV string to Anaplan in sequential chunks. 
+            
+            Args:
+                workspace_id (str): The Anaplan workspace ID.
+                model_id (str): The Anaplan destination model ID.
+                file_id (str): The specific file ID in Anaplan.
+                csv_data (str): The string representing the model to be updated.
+                chunk_size_mb (int): The size of the chunk to be uploaded in Megabytes. Defaults to 10.
+                
+            Raises:
+                AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
+            """
+            # --- STEP 1: Initialise the partial upload stream ---
+            headers = self.authenticator.get_auth_headers()
+            headers["Content-Type"] = "application/json"
+
+            init_url_path = self._upload_file_url_builder(workspace_id, model_id, file_id)
+
+            try:
+                init_response = self.http_client.post(
+                    init_url_path, 
+                    headers=headers, 
+                    json={"chunkCount": -1}
+                )
+                init_response.raise_for_status()
+                
+                # --- STEP 2: Slice and Stream the bytes to Anaplan ---
+                byte_data = csv_data.encode('utf-8')
+                chunk_size_bytes = chunk_size_mb * 1024 * 1024
+                total_bytes = len(byte_data)
+
+                for i in range(0, total_bytes, chunk_size_bytes):
+                    chunk = byte_data[i : i + chunk_size_bytes]
+                    chunk_id = str(i // chunk_size_bytes)
+                    
+                    logger.info(f"Uploading Chunk {chunk_id} for file {file_id}...")
+
+                    chunk_url = self._file_chunk_url_builder(workspace_id, model_id, file_id, chunk_id)
+                    
+                    chunk_headers = self.authenticator.get_auth_headers()
+                    chunk_headers["Content-Type"] = "application/octet-stream"
+
+                    chunk_response = self.http_client.put(
+                        chunk_url,
+                        headers=chunk_headers,
+                        content=chunk 
+                    )
+                    chunk_response.raise_for_status()
+                
+                logger.info("Uploading Chunks Process Completed. Finalizing...")
+
+                # --- STEP 3: Post the final request to inform the partial upload has completed ---
+                complete_url = self._file_complete_url_builder(workspace_id, model_id, file_id)
+                complete_headers = self.authenticator.get_auth_headers()
+                complete_headers["Content-Type"] = "application/json"
+                
+                complete_response = self.http_client.post(
+                    complete_url,
+                    headers=complete_headers,
+                    json={"id": file_id}
+                )
+                complete_response.raise_for_status()
+                        
+            except httpx.HTTPError as e:
+                # Updated to a more generic error message
+                raise AnaplanConnectionError(f"Failed during chunked upload process: {str(e)}") from e
 
     # Helper Methods ##########################################################################
-    def url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
+    def _upload_file_url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
         """
         Constructs the specific endpoint path for an Anaplan file.
 
@@ -287,7 +351,7 @@ class AnaplanClient:
         """
         return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}"
     
-    def process_url_builder(self, workspace_id: str, model_id: str, process_id: str) -> str:
+    def _process_url_builder(self, workspace_id: str, model_id: str, process_id: str) -> str:
         """
         Constructs the specific endpoint path for an Anaplan process action.
 
@@ -315,3 +379,32 @@ class AnaplanClient:
             str: The constructed Anaplan URL path.
         """
         return f"/workspaces/{workspace_id}/models/{model_id}/processes/{process_id}/tasks/{task_id}"
+    
+    def _file_chunk_url_builder(self, workspace_id: str, model_id: str, file_id: str, chunk_id: str) -> str:
+        """
+        Constructs the specific endpoint path for an Anaplan chunk upload API.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            file_id: Anaplan's destination file id as string
+            chunk_id: Index of the chunk to be uploaded
+            
+        Returns:
+            str: The constructed Anaplan URL path.
+        """
+        return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks/{chunk_id}"
+    
+    def _file_complete_url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
+        """
+        Constructs the specific endpoint path to complete a chunked file upload.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            file_id: Anaplan's destination file id as string
+            
+        Returns:
+            str: The constructed Anaplan URL path.
+        """
+        return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/complete"
