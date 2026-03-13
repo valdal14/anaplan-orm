@@ -21,13 +21,22 @@ class Authenticator(ABC):
 
 class BasicAuthenticator(Authenticator):
     AUTH_URL = "https://auth.anaplan.com/token/authenticate"
+    # 30 mins default token refresh time
+    DEFAULT_TOKEN_REFRESH_TIME: int = 1800 
 
     def __init__(self, email: str, pwd: str, verify_ssl: bool = True):
         self.email = email
         self.pwd = pwd
         self.verify_ssl = verify_ssl
+        self._cached_token: str | None = None
+        self._token_timestamp: float = 0.0
 
-    def get_auth_headers(self) -> dict:
+    def _requires_new_token(self) -> bool:
+        """ Returns True if a new token is needed, False otherwise. """
+        return (self._cached_token is None) or (time.time() - self._token_timestamp > self.DEFAULT_TOKEN_REFRESH_TIME)
+    
+    def _perform_basic_auth_request(self) -> None:
+        """ Fetches a new token from Anaplan and updates internal state. """
         try:
             response = httpx.post(
                 self.AUTH_URL, 
@@ -42,24 +51,30 @@ class BasicAuthenticator(Authenticator):
                 err_msg = json_payload.get("statusMessage", "Unknown Error")
                 raise AnaplanConnectionError(f"Anaplan Auth Failed. Status: {json_payload.get('status')} - {err_msg}")
             
-            # Extract the actual token string
             # NOTE: Not removing the following comments for now since later
             # on I need to get extra values from the returned dic.
-
-            # print(json_payload)
-            # print(json_payload["status"])
             # print(json_payload["tokenInfo"]["expiresAt"])
-            # print(json_payload["tokenInfo"]["tokenValue"])
             # print(json_payload["tokenInfo"]["refreshTokenId"])
-            token_value = json_payload["tokenInfo"]["tokenValue"]
             
-            return {
-                "Authorization": f"AnaplanAuthToken {token_value}",
-                "Content-Type": "application/json"
-            }
+            # Save the new token
+            self._cached_token = json_payload["tokenInfo"]["tokenValue"]
+            
+            # Start the stopwatch
+            self._token_timestamp = time.time()
             
         except httpx.HTTPError as e:
             raise AnaplanConnectionError(f"Authentication failed: {str(e)}") from e
+
+    def get_auth_headers(self) -> dict:
+        """ Returns the authorization headers, fetching a new token only if necessary. """
+        if self._requires_new_token():
+            self._perform_basic_auth_request()
+            
+        # Returns the cached token (whether it was just fetched or is still valid)
+        return {
+            "Authorization": f"AnaplanAuthToken {self._cached_token}",
+            "Content-Type": "application/json"
+        }
 
 class AnaplanClient:
     """
