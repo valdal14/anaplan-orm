@@ -21,22 +21,19 @@ class AnaplanModel(BaseModel):
 
     @classmethod
     def to_csv(cls, instances: list['AnaplanModel'], separator: str = ',') -> str:
-        """
-        Converts a list of AnaplanModel instances into a CSV formatted string.
-        """
+        """ Converts a list of AnaplanModel instances into a CSV formatted string. """
         if not instances:
             return ""
             
-        # Extract headers directly from the Pydantic class schema
-        headers = list(cls.model_fields.keys())
+        # Safely extract headers using aliases
+        headers = [field.alias if field.alias else name for name, field in cls.model_fields.items()]
         
-        # Set up the in-memory string buffer
         output = io.StringIO()
-        writer = csv.writer(output, delimiter=separator)
+        # Force strict Unix line endings so Anaplan always parses correctly
+        writer = csv.writer(output, delimiter=separator, lineterminator='\n')
         
-        # Write headers and data
         writer.writerow(headers)
         for instance in instances:
-            writer.writerow(instance.model_dump().values())
+            writer.writerow(instance.model_dump(by_alias=True).values())
             
         return output.getvalue()
