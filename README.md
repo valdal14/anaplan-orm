@@ -10,14 +10,60 @@ A lightweight Python 3 library that abstracts the Anaplan API into an Object-Rel
 🚀 **Active Beta** 🚀
 Core data transformation, parsing engine, and Anaplan chunked API client are complete.
 
-## Features
-* **Data Ingestion:** Extracts XML string payloads directly into strictly typed Pydantic V2 models.
-* **Data Serialization:** Serializes Pydantic models into Anaplan-ready CSV payloads with robust alias and dynamic separator support.
-* **API Client:** Handles Anaplan Basic Authentication with stateful token caching and automatic renewal.
-* **Large File Streaming:** Automatically slices and streams massive datasets via Anaplan's Chunked Upload API to prevent memory crashes.
-* **Process Automation:** Triggers Anaplan Import Actions and natively polls the database engine for completion status.
+## 🌟 Features
+
+* **Pydantic Data Ingestion:** Validates and maps Python objects to Anaplan models effortlessly.
+* **Enterprise Security:** Supports standard Basic Authentication and Anaplan's proprietary RSA-SHA512 Certificate-based Authentication (mTLS).
+* **Resilient Networking:** Built-in exponential backoff and automated retries to protect against dropped packets and network blips.
+* **Massive Payloads:** Automatically handles chunked file uploads for multi-megabyte/gigabyte datasets without memory crashes.
+* **Smart Polling:** Asynchronous process execution with configurable, patient polling for long-running database transactions.
 
 ---
+
+## 🔐 Authentication
+
+`anaplan-orm` uses a decoupled authentication strategy, allowing you to easily swap between development and production security standards.
+
+### 1. Basic Authentication
+Ideal for development and sandbox testing.
+
+```python
+from anaplan_orm.client import AnaplanClient
+from anaplan_orm.authenticator import BasicAuthenticator
+
+auth = BasicAuthenticator("your_email@company.com", "your_password")
+client = AnaplanClient(authenticator=auth)
+```
+
+### 2. Certificate-Based Authentication (Enterprise Standard)
+
+For production environments, Anaplan requires a custom RSA-SHA512 signature. The CertificateAuthenticator handles this cryptographic handshake automatically.
+
+Note: The library expects a .pem file containing both your private key and public certificate. If your enterprise issues a .p12 keystore, you can extract it using your terminal:
+
+```bash
+openssl pkcs12 -in keystore.p12 -out certificate.pem
+```
+
+```python
+from anaplan_orm.client import AnaplanClient
+from anaplan_orm.authenticator import CertificateAuthenticator
+
+# 1. Initialize the Certificate Authenticator
+auth = CertificateAuthenticator(
+    cert_path="path/to/your/certificate.pem",
+    # Omit if your private key is unencrypted
+    cert_password="your_secure_password", 
+    # Set to False if you need to bypass a corporate proxy
+    verify_ssl=True
+)
+
+# 2. Inject it into the Anaplan Client
+client = AnaplanClient(authenticator=auth)
+
+# 3. Execute a request
+status = client.ping()
+```
 
 ## Quick Start: XML Parsing & Data Upload
 The `anaplan-orm` is designed to take raw XML strings (e.g., from MuleSoft or data pipeline payloads), validate them into Python objects, and stream them directly into Anaplan.
