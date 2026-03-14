@@ -1,7 +1,8 @@
 import pytest
 import httpx
 from unittest.mock import patch, Mock, MagicMock, call
-from anaplan_orm.client import AnaplanClient, Authenticator, BasicAuthenticator
+from anaplan_orm.client import AnaplanClient
+from anaplan_orm.authenticator import Authenticator, BasicAuthenticator
 from anaplan_orm.exceptions import AnaplanConnectionError
 
 # Create our Dummy Authenticator
