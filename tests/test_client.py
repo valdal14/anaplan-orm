@@ -1,13 +1,20 @@
 import pytest
 import httpx
-from unittest.mock import patch, Mock, MagicMock, call
-from anaplan_orm.client import AnaplanClient, Authenticator, BasicAuthenticator
+import time
+from unittest.mock import patch, Mock, MagicMock, call, mock_open
+from anaplan_orm.client import AnaplanClient
+from anaplan_orm.authenticator import Authenticator, BasicAuthenticator, CertificateAuthenticator
 from anaplan_orm.exceptions import AnaplanConnectionError
 
 # Create our Dummy Authenticator
 class DummyAuthenticator(Authenticator):
-    def get_auth_headers(self) -> dict:
-        return {"Authorization": "AnaplanAuthToken FakeTestToken"}
+    def __init__(self):
+        super().__init__() # Initialize the base class token caching
+        
+    def authenticate(self) -> None:
+        """ Fakes the network request and instantly provisions a dummy token. """
+        self._cached_token = "FakeTestToken"
+        self._token_timestamp = time.time()
 
 def test_ping_returns_status_code():
     """Test that the client correctly returns the status code from the HTTP response."""
@@ -25,7 +32,7 @@ def test_ping_returns_status_code():
     # Assert: Verify ping method returned the mocked 401
     assert status == 401
     # Verify the client actually tried to pass the correct headers to httpx
-    mock_get.assert_called_once_with("/users/me", headers={"Authorization": "AnaplanAuthToken FakeTestToken"})
+    mock_get.assert_called_once_with("/users/me", headers={"Authorization": "AnaplanAuthToken FakeTestToken", "Content-Type": "application/json"})
 
 def test_ping_raises_custom_connection_error():
     """Test that httpx network failures are caught and raised as AnaplanConnectionError."""
@@ -177,7 +184,8 @@ def test_get_process_task_status_success():
         # Verify httpx.get was called with the correct URL and headers keyword argument
         expected_url = f"/workspaces/{workspace_id}/models/{model_id}/processes/{process_id}/tasks/{task_id}"
         expected_headers = {
-            "Authorization": "AnaplanAuthToken FakeTestToken"
+            "Authorization": "AnaplanAuthToken FakeTestToken",
+            "Content-Type": "application/json"
         }
         
         mock_get.assert_called_once_with(
@@ -390,3 +398,70 @@ def get_basic_authenticator(is_mocked_authenticator: bool = True) -> Authenticat
         return DummyAuthenticator()
     else:
         return BasicAuthenticator("test@company.com", "pwd123")
+    
+# NOTE: Certificate Authentication Tests ============================================
+
+# A fake PEM file string to trick the file reader
+FAKE_PEM = b"""-----BEGIN PRIVATE KEY-----
+FakeKeyData
+-----END PRIVATE KEY-----
+-----BEGIN CERTIFICATE-----
+FakeCertData
+-----END CERTIFICATE-----"""
+
+@patch("anaplan_orm.authenticator.httpx.post")
+@patch("anaplan_orm.authenticator.serialization.load_pem_private_key")
+@patch("anaplan_orm.authenticator.os.urandom", return_value=b"fake_random_bytes")
+@patch("builtins.open", new_callable=mock_open, read_data=FAKE_PEM)
+def test_certificate_authenticator_success(mock_file, mock_urandom, mock_load_key, mock_post):
+    """Test that CertificateAuthenticator correctly signs the payload and parses the token."""
+    # Setup the cryptography mock
+    mock_private_key = Mock()
+    mock_private_key.sign.return_value = b"fake_signature"
+    mock_load_key.return_value = mock_private_key
+
+    # Setup the network mock
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "status": "SUCCESS",
+        "tokenInfo": {"tokenValue": "CertToken123"}
+    }
+    mock_post.return_value = mock_response
+
+    # Execute
+    auth = CertificateAuthenticator(cert_path="/fake/path/cert.pem", cert_password="mule", verify_ssl=False)
+    auth.authenticate()
+
+    # Verify the internal state updated correctly
+    assert auth._cached_token == "CertToken123"
+    
+    # Verify the exact Anaplan cryptographic payload was sent
+    call_kwargs = mock_post.call_args.kwargs
+    assert call_kwargs["headers"]["Authorization"] == "CACertificate FakeCertData"
+    # "ZmFrZV9yYW5kb21fYnl0ZXM=" is the base64 string for "fake_random_bytes"
+    assert call_kwargs["json"]["encodedData"] == "ZmFrZV9yYW5kb21fYnl0ZXM=" 
+    # "ZmFrZV9zaWduYXR1cmU=" is the base64 string for "fake_signature"
+    assert call_kwargs["json"]["encodedSignedData"] == "ZmFrZV9zaWduYXR1cmU="
+
+@patch("anaplan_orm.authenticator.httpx.post")
+@patch("anaplan_orm.authenticator.serialization.load_pem_private_key")
+@patch("builtins.open", new_callable=mock_open, read_data=FAKE_PEM)
+def test_certificate_authenticator_failure(mock_file, mock_load_key, mock_post):
+    """Test that CertificateAuthenticator handles Anaplan rejection properly."""
+    mock_private_key = Mock()
+    mock_private_key.sign.return_value = b"fake_signature"
+    mock_load_key.return_value = mock_private_key
+
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "status": "FAILURE",
+        "statusMessage": "Invalid Certificate Signature"
+    }
+    mock_post.return_value = mock_response
+
+    auth = CertificateAuthenticator(cert_path="/fake/path/cert.pem")
+    
+    with pytest.raises(AnaplanConnectionError) as exc_info:
+        auth.authenticate()
+        
+    assert "Anaplan Auth Failed: Invalid Certificate Signature" in str(exc_info.value)

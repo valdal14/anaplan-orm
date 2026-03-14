@@ -208,3 +208,9 @@ __marimo__/
 
 # macOS
 .DS_Store
+
+# Certificates
+*.pem
+
+# Remove playground.py
+*_playground.py
