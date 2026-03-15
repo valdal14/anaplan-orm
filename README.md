@@ -14,7 +14,7 @@ Core data transformation, parsing engine, and Anaplan chunked API client are com
 
 * **Pydantic Data Ingestion:** Validates and maps Python objects to Anaplan models effortlessly.
 * **Enterprise Security:** Supports standard Basic Authentication and Anaplan's proprietary RSA-SHA512 Certificate-based Authentication (mTLS).
-* **Resilient Networking:** Built-in exponential backoff and automated retries to protect against dropped packets and network blips.
+* **Resilient Networking:** Built-in exponential backoff, automated retries to protect against dropped packets, and mid-flight authentication token refreshing for massive, long-running pipelines.
 * **Massive Payloads:** Automatically handles chunked file uploads for multi-megabyte/gigabyte datasets without memory crashes.
 * **Smart Polling:** Asynchronous process execution with configurable, patient polling for long-running database transactions.
 
