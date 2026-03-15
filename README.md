@@ -196,3 +196,55 @@ for row in parsed_rows:
 for model in valid_models:
     model.outlook_eur = model.outlook_eur * 1.05
 ```
+
+## 🤝 Contributing to anaplan-orm
+
+We welcome contributions! To maintain enterprise-grade code quality, this project uses strict formatting, linting, and testing pipelines.
+
+### Prerequisites
+* **Python 3.10+**
+* **Poetry** (Dependency management)
+
+### 1. Local Setup
+Clone the repository and install all dependencies (including the `dev` group tools like Pytest and Ruff):
+
+```bash
+git clone [https://github.com/valdal14/anaplan-orm.git](https://github.com/valdal14/anaplan-orm.git)
+cd anaplan-orm
+poetry install
+```
+
+### 2. Formatting & Linting (Ruff)
+This project enforces strict PEP 8 compliance using **Ruff**. Before submitting any code, you must format and lint your changes. If you do not run these commands, the GitHub Actions CI pipeline will fail your Pull Request.
+
+Run the formatter to automatically fix spacing, quotes, and line breaks:
+
+```bash
+poetry run python3 -m ruff format .
+```
+
+Run the linter to catch unused imports, bad variables, and logical style issues:
+
+```bash
+poetry run python3 -m ruff check --fix .
+```
+
+(Tip: I highly recommend installing the Ruff extension in your IDE and setting it to "Format on Save").
+
+### 3. Running Tests (Pytest)
+
+Every feature and bug fix must be covered by unit tests. The test suite heavily utilizes Python's unittest.mock to simulate Anaplan network responses without requiring live API credentials.
+
+Run the entire test suite:
+
+```bash
+poetry run python3 -m pytest
+```
+
+### 4. The Pull Request Workflow
+
+1 - Create a feature branch (e.g., feature/ORM-123-new-parser).
+2 - Write your code and your tests.
+3 - Run Ruff (format and check) and Pytest.
+4 - Push your branch to GitHub and open a Pull Request against main.
+4 - Wait for the automated CI pipeline to verify your build before merging.
