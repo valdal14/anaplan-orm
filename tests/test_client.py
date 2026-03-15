@@ -6,6 +6,12 @@ from anaplan_orm.client import AnaplanClient
 from anaplan_orm.authenticator import Authenticator, BasicAuthenticator, CertificateAuthenticator
 from anaplan_orm.exceptions import AnaplanConnectionError
 
+@pytest.fixture(autouse=True)
+def bypass_sleep():
+    """Globally bypasses time.sleep() for all tests in this file so they run instantly."""
+    with patch("time.sleep") as mock_sleep:
+        yield mock_sleep
+
 # Create our Dummy Authenticator
 class DummyAuthenticator(Authenticator):
     def __init__(self):
@@ -520,3 +526,38 @@ def test_download_file_chunked_success(mock_download_chunk, mock_chunk_count):
     # Verify the helpers were called the correct number of times
     assert mock_chunk_count.call_count == 1
     assert mock_download_chunk.call_count == 2
+
+# NOTE: DECORATOR & RETRY TESTS #################################################################################
+
+@patch("anaplan_orm.client.httpx.Client.post")
+def test_retry_decorator_handles_401_token_expiry(mock_post):
+    """Test that a 401 Unauthorized correctly triggers a token wipe and retry."""
+    
+    # 1. Setup the fake 401 Error
+    mock_401_response = Mock()
+    mock_401_response.status_code = 401
+    error_401 = httpx.HTTPStatusError(
+        message="Unauthorized",
+        request=Mock(),
+        response=mock_401_response
+    )
+    
+    # 2. Setup the fake Success response
+    mock_success_response = Mock()
+    mock_success_response.json.return_value = {"task": {"taskId": "task_123"}}
+    
+    # 3. Tell the mock to fail on the first call, and succeed on the second
+    mock_post.side_effect = [error_401, mock_success_response]
+    
+    # 4. Setup the Client with a fully mocked Authenticator
+    mock_auth = Mock()
+    mock_auth.get_auth_headers.return_value = {"Authorization": "AnaplanAuthToken Expired123"}
+    client = AnaplanClient(authenticator=mock_auth)
+    
+    # 5. Execute a network method (execute_export is wrapped in our decorator)
+    task_id = client.execute_export("workspace_id", "model_id", "export_id")
+    
+    # 6. The Assertions (The Proof)
+    assert task_id == "task_123", "The method did not return the successful task ID."
+    assert mock_post.call_count == 2, "The network call was not retried exactly once."
+    mock_auth.clear_token.assert_called_once(), "The authenticator's cache was not wiped!"

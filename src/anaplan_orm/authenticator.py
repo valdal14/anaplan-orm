@@ -23,6 +23,10 @@ class Authenticator(ABC):
     def _requires_new_token(self) -> bool:
         """ Returns True if a new token is needed, False otherwise. """
         return (self._cached_token is None) or (time.time() - self._token_timestamp > self.DEFAULT_TOKEN_REFRESH_TIME)
+    
+    def clear_token(self) -> None:
+        """Wipes the cached token, forcing a fresh handshake on the next request."""
+        self._cached_token = None
 
     def get_auth_headers(self) -> dict:
         """ Returns the authorization headers, fetching a new token only if necessary. """
