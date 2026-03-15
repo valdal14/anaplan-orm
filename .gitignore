@@ -214,3 +214,11 @@ __marimo__/
 
 # Remove playground.py
 *_playground.py
+
+# Ignore the local data directory
+playground_data/
+
+# Global safety net for data files
+*.json
+*.xml
+*.csv

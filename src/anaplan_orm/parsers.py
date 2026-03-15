@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 
@@ -13,7 +14,7 @@ class DataParser(ABC):
     """
 
     @abstractmethod
-    def parse(self, payload: str) -> list[dict]:
+    def parse(self, payload: str, **kwargs) -> list[dict]:
         """
         Parses a raw string payload into a list of dictionaries.
 
@@ -26,10 +27,59 @@ class DataParser(ABC):
         pass
 
 
+# ⬇️ OUTBOUND PIPELINE PARSERS (Anaplan -> Target) ########################################################
+class CSVStringParser(DataParser):
+    """
+    A concrete implementation of DataParser designed to handle CSV data.
+
+    PRIMARY USE CASE: Outbound Pipelines (Anaplan ➔ External Target).
+    Because Anaplan strictly exports data as CSV payloads, this parser is used to take
+    the raw string downloaded from the AnaplanClient and flat-map it into dictionaries
+    so it can be inflated back into Pydantic ORM models for downstream transformation.
+    """
+
+    @classmethod
+    def parse(cls, csv_str_payload: str) -> list[dict]:
+        """
+        Extracts row data from a flat CSV string.
+
+        Args:
+            csv_str_payload (str): The raw CSV string downloaded from Anaplan.
+
+        Raises:
+            TypeError: If the payload is not a string.
+            ValueError: If the CSV string is empty or entirely whitespace.
+
+        Returns:
+            list[dict]: A list where each dictionary is a row, with CSV headers as keys
+                and column data as values.
+        """
+        if not isinstance(csv_str_payload, str):
+            raise TypeError("Invalid Payload: Expected a string.")
+
+        if not csv_str_payload or not csv_str_payload.strip():
+            raise ValueError("Cannot parse an empty CSV string.")
+
+        # Use io.StringIO to turn the raw string into an in-memory file buffer
+        string_buffer = io.StringIO(csv_str_payload.strip())
+
+        # Use csv.DictReader to automatically read the first row as headers
+        # and map all subsequent rows to those header keys.
+        reader = csv.DictReader(string_buffer)
+
+        # Convert the reader generator into a clean list of dictionaries
+        csv_elements = [row for row in reader]
+
+        return csv_elements
+
+
+# ⬆️ INBOUND PIPELINE PARSERS (Source -> Anaplan) #########################################################
 class XMLStringParser(DataParser):
     """
     A concrete implementation of DataParser designed to handle XML data
     embedded within a standard string.
+
+    PRIMARY USE CASE: Inbound Pipelines
     """
 
     @classmethod
@@ -67,42 +117,57 @@ class XMLStringParser(DataParser):
         return xml_elements
 
 
-class CSVStringParser(DataParser):
+class JSONParser(DataParser):
     """
-    A concrete implementation of DataParser designed to handle CSV data
-    embedded within a standard string, exactly as downloaded from Anaplan.
+    A concrete implementation of DataParser designed to handle JSON data
+    embedded within a standard string.
+
+    PRIMARY USE CASE: Inbound Pipelines (REST API ➔ Anaplan).
     """
 
     @classmethod
-    def parse(cls, csv_str_payload: str) -> list[dict]:
+    def parse(cls, json_str_payload: str, data_key: str = None) -> list[dict]:
         """
-        Extracts row data from a flat CSV string.
+        Extracts row data from a JSON formatted string.
 
         Args:
-            csv_str_payload (str): The raw CSV string downloaded from Anaplan.
+            json_str_payload (str): The raw JSON string.
+            data_key (str, optional): The key to extract if the array of records
+                                      is nested inside a root JSON object.
 
         Raises:
             TypeError: If the payload is not a string.
-            ValueError: If the CSV string is empty or entirely whitespace.
+            ValueError: If the payload is empty or invalid JSON.
 
         Returns:
-            list[dict]: A list where each dictionary is a row, with CSV headers as keys
-                and column data as values.
+            list[dict]: A list where each dictionary is a row of data.
         """
-        if not isinstance(csv_str_payload, str):
+        if not isinstance(json_str_payload, str):
             raise TypeError("Invalid Payload: Expected a string.")
 
-        if not csv_str_payload or not csv_str_payload.strip():
-            raise ValueError("Cannot parse an empty CSV string.")
+        if not json_str_payload or not json_str_payload.strip():
+            raise ValueError("Cannot parse an empty JSON string.")
 
-        # Use io.StringIO to turn the raw string into an in-memory file buffer
-        string_buffer = io.StringIO(csv_str_payload.strip())
+        # Load the JSON string
+        try:
+            parsed_data = json.loads(json_str_payload)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to decode JSON payload: {str(e)}")
 
-        # Use csv.DictReader to automatically read the first row as headers
-        # and map all subsequent rows to those header keys.
-        reader = csv.DictReader(string_buffer)
+        # Extract nested data if a data_key is requested
+        if data_key is not None:
+            if isinstance(parsed_data, dict):
+                # Use .get() safely, defaulting to an empty list if the key doesn't exist
+                parsed_data = parsed_data.get(data_key, [])
+            else:
+                raise ValueError(
+                    f"Cannot extract data_key '{data_key}' because the JSON root is a list, not a dictionary."
+                )
 
-        # Convert the reader generator into a clean list of dictionaries
-        csv_elements = [row for row in reader]
-
-        return csv_elements
+        # Ensure the return type is strictly a list[dict]
+        if isinstance(parsed_data, dict):
+            return [parsed_data]
+        elif isinstance(parsed_data, list):
+            return parsed_data
+        else:
+            raise TypeError("Parsed JSON must result in a dictionary or a list of dictionaries.")
