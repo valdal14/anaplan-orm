@@ -127,7 +127,7 @@ class CertificateAuthenticator(Authenticator):
                 "encodedSignedData": encoded_signed_data
             }
 
-            # Send a standard POST request (we no longer use httpx.Client cert mapping)
+            # Send a standard POST request
             response = httpx.post(
                 self.AUTH_URL, 
                 headers=headers, 

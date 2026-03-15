@@ -51,6 +51,7 @@ class AnaplanClient:
         except httpx.RequestError as e:
             raise AnaplanConnectionError(f"Network error communicating with Anaplan: {str(e)}") from e
     
+    # NOTE: Methods used to upload of CSVs into Anaplan ################################################################################
     @retry_network_errors()
     def upload_file(self, workspace_id: str, model_id: str, file_id: str, csv_data: str) -> None:
         """
@@ -174,7 +175,7 @@ class AnaplanClient:
         task_state = anaplan_task.get("taskState")
         is_successful = anaplan_task.get("result", {}).get("successful", False)
 
-        # Evaluate if it finished completely
+        # Evaluate if Anaplan it finished completely
         if task_state == "COMPLETE":
             if is_successful:
                 return anaplan_task
@@ -182,7 +183,7 @@ class AnaplanClient:
                 # Raise if finished, but Anaplan rejected the data
                 raise AnaplanConnectionError(f"Anaplan process completed but failed internally. Task info: {anaplan_task}")
 
-        # Evaluate if it is still working
+        # Evaluate if Anaplan it is still working
         if task_state in ["IN_PROGRESS", "NOT_STARTED"]:
             self._process_to_sleep(poll_interval)
             return self.wait_for_process_completion(
@@ -196,11 +197,6 @@ class AnaplanClient:
             
         # Evaluate if it was cancelled by an admin or hit an unknown state
         raise AnaplanConnectionError(f"Process execution halted. Final state: {task_state}")
-            
-    def _process_to_sleep(self, t: int) -> None:
-        """Helper method to manage polling intervals by pausing script execution."""
-        for _ in range(t):
-            time.sleep(1)
 
     def upload_file_chunked(self, workspace_id: str, model_id: str, file_id: str, csv_data: str, chunk_size_mb: int = 10) -> None:
         """ 
@@ -273,8 +269,209 @@ class AnaplanClient:
         """Isolated helper to send the final request for chunks upload, protected by retries."""
         response = self.http_client.post(url, headers=headers, json={"id": file_id})
         response.raise_for_status()
+ 
+    # NOTE: Method used to exports/downloads From Anaplan ############################################################################## 
+    @retry_network_errors()
+    def execute_export(self, workspace_id: str, model_id: str, export_id: str) -> str:
+        """ 
+        Executes an Anaplan export action to generate a downloadable file. 
+        
+        Args:
+            workspace_id (str): The Anaplan workspace ID.
+            model_id (str): The Anaplan destination model ID.
+            export_id (str): Anaplan's destination export id as string.
+            
+        Returns:
+            str: The Anaplan Task ID generated for this export process.
 
-    # Helper Methods ##########################################################################
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
+        """
+        headers = self.authenticator.get_auth_headers()
+        headers["Content-Type"] = "application/json"
+
+        url_path = self._export_url_builder(workspace_id, model_id, export_id)
+
+        try:
+            response = self.http_client.post(
+                url_path, 
+                headers=headers, 
+                json={"localeName": "en_US"}
+            )
+            response.raise_for_status()
+
+            return response.json()["task"]["taskId"]
+
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(f"Failed to execute export in Anaplan: {str(e)}") from e
+    
+    @retry_network_errors()
+    def _get_export_task_status(self, workspace_id: str, model_id: str, export_id: str, task_id: str) -> dict:
+        """ 
+        Checks the Anaplan status of the given export task.
+        
+        Args:
+            workspace_id (str): The Anaplan workspace ID.
+            model_id (str): The Anaplan destination model ID.
+            export_id (str): Anaplan's destination export id as string.
+            task_id (str): Anaplan's task id used to check request status.
+
+        Returns:
+            dict: Contains the information about the status of the export process.
+            
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
+        """
+        headers = self.authenticator.get_auth_headers()
+        headers["Content-Type"] = "application/json"
+
+        url_path = self._export_task_url_builder(workspace_id, model_id, export_id, task_id)
+
+        try:
+            response = self.http_client.get(url_path, headers=headers)
+            response.raise_for_status()
+
+            return response.json()["task"]
+
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(f"Failed to fetch export status from Anaplan: {str(e)}") from e
+        
+    def wait_for_export_completion(self, workspace_id: str, model_id: str, export_id: str, task_id: str, retry: int = 60, poll_interval: int = 5) -> dict:
+        """
+        Actively polls the Anaplan API to check the export status of an asynchronous process.
+        
+        This method uses recursion to pause and re-check the export status until it 
+        either completes successfully, fails internally, or exhausts the allowed retries.
+        
+        Args:
+            workspace_id (str): The Anaplan workspace ID.
+            model_id (str): The Anaplan destination model ID.
+            export_id (str): The specific export ID being executed.
+            task_id (str): The specific task ID generated by the initial export execution.
+            retry (int, optional): The number of polling attempts remaining. Defaults to 60 (approx 5 minutes max wait).
+            poll_interval (int, optional): The seconds to wait between polling attempts. Defaults to 5.
+            
+        Returns:
+            dict: The complete task dictionary returned by Anaplan upon successful completion.
+            
+        Raises:
+            AnaplanConnectionError: If the process fails, is cancelled, or runs out of retries.
+        """
+        if retry <= 0:
+            raise AnaplanConnectionError(f"Anaplan export {export_id} did not complete within the assigned time.")
+
+        anaplan_export = self._get_export_task_status(workspace_id, model_id, export_id, task_id)
+        
+        export_state = anaplan_export.get("taskState")
+        is_successful = anaplan_export.get("result", {}).get("successful", False)
+
+        # Evaluate if Anaplan finished completely
+        if export_state == "COMPLETE":
+            if is_successful:
+                return anaplan_export
+            else:
+                # Raise if finished, but Anaplan rejected the data
+                raise AnaplanConnectionError(f"Anaplan export process completed but failed internally. Task info: {anaplan_export}")
+
+        # Evaluate if Anaplan it is still working
+        if export_state in ["IN_PROGRESS", "NOT_STARTED"]:
+            self._process_to_sleep(poll_interval)
+            return self.wait_for_export_completion(
+                workspace_id,
+                model_id,
+                export_id,
+                task_id,
+                retry - 1,
+                poll_interval
+            )
+            
+        # Evaluate if it was cancelled by an admin or hit an unknown state
+        raise AnaplanConnectionError(f"Process execution halted. Final state: {export_state}")
+
+    def download_file_chunked(self, workspace_id: str, model_id: str, file_id: str) -> str:
+        """
+        Downloads a file from Anaplan in sequential chunks and assembles it into a string.
+
+        Args:
+            workspace_id (str): The Anaplan workspace ID.
+            model_id (str): The Anaplan destination model ID.
+            file_id (str): The Anaplan destination file ID (usually the same as the export ID).
+        
+        Returns:
+            str: The fully decoded UTF-8 string representation of the downloaded file.
+            
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
+        """
+        try:
+            # 1. Get the chunk count directly from the /chunks endpoint
+            chunks_url = f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks"
+            chunk_count = self._get_download_chunk_count(chunks_url)
+            
+            # 2. Assemble the bytes
+            downloaded_bytes = bytearray()
+            
+            for i in range(chunk_count):
+                chunk_id = str(i)
+                logger.info(f"Downloading Chunk {chunk_id} of {chunk_count - 1} for file {file_id}...")
+                
+                chunk_url = self._file_chunk_url_builder(workspace_id, model_id, file_id, chunk_id)
+                
+                chunk_data = self._download_chunk(chunk_url)
+                downloaded_bytes.extend(chunk_data)
+            
+            logger.info("Downloading Chunks Process Completed. Decoding...")
+            
+            # 3. Decode to string
+            return downloaded_bytes.decode('utf-8')
+            
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(f"Failed during chunked download process: {str(e)}") from e
+
+    @retry_network_errors()
+    def _get_download_chunk_count(self, url_path: str) -> int:
+        """
+        Fetches the total number of chunks available for a specific Anaplan file download.
+
+        Args:
+            url_path (str): The URL destination path to execute the GET request.
+
+        Returns:
+            int: The total number of chunks.
+        
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
+        """
+        headers = self.authenticator.get_auth_headers()
+        
+        try:
+            response = self.http_client.get(url_path, headers=headers)
+            response.raise_for_status()
+            
+            # Anaplan returns a JSON payload with a 'chunks' array. We just count the items!
+            return len(response.json().get("chunks", []))
+            
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(f"Failed to fetch chunk count from Anaplan: {str(e)}") from e
+    
+    @retry_network_errors()
+    def _download_chunk(self, url_path: str) -> bytes:
+        """Isolated helper to fetch a single file chunk, protected by retries."""
+        headers = self.authenticator.get_auth_headers()
+        # Must use 'Accept' to inform Anaplan we want raw bytes back
+        headers["Accept"] = "application/octet-stream"
+
+        response = self.http_client.get(url_path, headers=headers)
+        response.raise_for_status()
+        
+        return response.content
+
+    # NOTE: Helper Methods ####################################################################################################
+    def _process_to_sleep(self, t: int) -> None:
+        """Helper method to manage polling intervals by pausing script execution."""
+        for _ in range(t):
+            time.sleep(1)
+
     def _upload_file_url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
         """
         Constructs the specific endpoint path for an Anaplan file.
@@ -346,3 +543,46 @@ class AnaplanClient:
             str: The constructed Anaplan URL path.
         """
         return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/complete"
+    
+    def _export_url_builder(self, workspace_id: str, model_id: str, export_id: str) -> str:
+        """
+        Constructs the specific endpoint path for an Anaplan export API.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            export_id: Anaplan's destination export id as string
+            
+        Returns:
+            str: The constructed Anaplan URL path.
+        """
+        return f"/workspaces/{workspace_id}/models/{model_id}/exports/{export_id}/tasks"
+    
+    def _export_task_url_builder(self, workspace_id: str, model_id: str, export_id: str, task_id: str) -> str:
+        """
+        Constructs the specific endpoint path for an Anaplan task API.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            export_id: Anaplan's destination export id as string
+            task_id: Anaplan's task id used to check request status
+            
+        Returns:
+            str: The constructed Anaplan URL path.
+        """
+        return f"/workspaces/{workspace_id}/models/{model_id}/exports/{export_id}/tasks/{task_id}"
+
+    def _file_info_url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
+        """
+        Constructs the specific endpoint path for an Anaplan file API.
+
+        Args:
+            workspace_id: Anaplan's workspace id as string
+            model_id: Anaplan's destination model id as string
+            file_id: Anaplan's destination file id as string
+            
+        Returns:
+            str: The constructed Anaplan URL path.
+        """
+        return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}"

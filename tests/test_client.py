@@ -399,7 +399,7 @@ def get_basic_authenticator(is_mocked_authenticator: bool = True) -> Authenticat
     else:
         return BasicAuthenticator("test@company.com", "pwd123")
     
-# NOTE: Certificate Authentication Tests ============================================
+# NOTE: Certificate Authentication Tests ########################################################################
 
 # A fake PEM file string to trick the file reader
 FAKE_PEM = b"""-----BEGIN PRIVATE KEY-----
@@ -465,3 +465,58 @@ def test_certificate_authenticator_failure(mock_file, mock_load_key, mock_post):
         auth.authenticate()
         
     assert "Anaplan Auth Failed: Invalid Certificate Signature" in str(exc_info.value)
+
+# NOTE: OUTBOUND PIPELINE TESTS #################################################################################
+
+@patch("anaplan_orm.client.httpx.Client.post")
+def test_execute_export_success(mock_post):
+    """Test that execute_export triggers the Anaplan API and returns a task ID."""
+    mock_response = Mock()
+    mock_response.json.return_value = {"task": {"taskId": "export_task_999"}}
+    mock_post.return_value = mock_response
+
+    auth = get_basic_authenticator()
+    client = AnaplanClient(authenticator=auth)
+
+    task_id = client.execute_export("workspace_id", "model_id", "export_id")
+
+    assert task_id == "export_task_999"
+    mock_post.assert_called_once()
+    assert "/exports/export_id/tasks" in mock_post.call_args[0][0]
+
+@patch("anaplan_orm.client.AnaplanClient._get_export_task_status")
+def test_wait_for_export_completion_success(mock_status):
+    """Test that the polling method successfully returns when the export completes."""
+    # Mock the Anaplan response to instantly say "COMPLETE"
+    mock_status.return_value = {"taskState": "COMPLETE", "result": {"successful": True}}
+
+    auth = get_basic_authenticator()
+    client = AnaplanClient(authenticator=auth)
+
+    result = client.wait_for_export_completion("w", "m", "e", "t")
+
+    assert result["taskState"] == "COMPLETE"
+    mock_status.assert_called_once()
+
+@patch("anaplan_orm.client.AnaplanClient._get_download_chunk_count")
+@patch("anaplan_orm.client.AnaplanClient._download_chunk")
+def test_download_file_chunked_success(mock_download_chunk, mock_chunk_count):
+    """Test that the download engine fetches the right chunk count and decodes them."""
+    # Tell the script there are exactly 2 chunks to download
+    mock_chunk_count.return_value = 2
+    
+    # Mock the raw bytes returned by each iteration of the loop
+    mock_download_chunk.side_effect = [b"Row1,Data\n", b"Row2,MoreData"]
+
+    auth = get_basic_authenticator()
+    client = AnaplanClient(authenticator=auth)
+
+    # Execute the download engine
+    final_csv_string = client.download_file_chunked("workspace_id", "model_id", "file_id")
+
+    # Verify the bytes were concatenated and decoded correctly
+    assert final_csv_string == "Row1,Data\nRow2,MoreData"
+    
+    # Verify the helpers were called the correct number of times
+    assert mock_chunk_count.call_count == 1
+    assert mock_download_chunk.call_count == 2
