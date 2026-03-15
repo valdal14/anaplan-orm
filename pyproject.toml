@@ -25,5 +25,25 @@ pythonpath = [
 
 [dependency-groups]
 dev = [
-    "pytest (>=9.0.2,<10.0.0)"
+    "pytest (>=9.0.2,<10.0.0)",
+    "ruff (>=0.15.6,<0.16.0)"
 ]
+
+[tool.ruff]
+# Set the maximum line length to 100
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# E = pycodestyle errors
+# F = pyflakes (unused variables, bad imports)
+# I = isort (alphabetize and group imports)
+select = ["E", "F", "I"]
+# Ignore lines that are too long if they are just strings/URLs
+ignore = ["E501"] 
+
+[tool.ruff.format]
+# Use double quotes for strings (standard Python convention)
+quote-style = "double"
+# Use spaces instead of tabs
+indent-style = "space"
