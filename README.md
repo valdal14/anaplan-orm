@@ -209,7 +209,7 @@ We welcome contributions! To maintain enterprise-grade code quality, this projec
 Clone the repository and install all dependencies (including the `dev` group tools like Pytest and Ruff):
 
 ```bash
-git clone [https://github.com/valdal14/anaplan-orm.git](https://github.com/valdal14/anaplan-orm.git)
+git clone https://github.com/valdal14/anaplan-orm.git
 cd anaplan-orm
 poetry install
 ```
@@ -243,8 +243,10 @@ poetry run python3 -m pytest
 
 ### 4. The Pull Request Workflow
 
+```bash
 1 - Create a feature branch (e.g., feature/ORM-123-new-parser).
 2 - Write your code and your tests.
 3 - Run Ruff (format and check) and Pytest.
 4 - Push your branch to GitHub and open a Pull Request against main.
 4 - Wait for the automated CI pipeline to verify your build before merging.
+```
