@@ -1,5 +1,6 @@
+import pytest
 from anaplan_orm.models import AnaplanModel
-from anaplan_orm.parsers import XMLStringParser
+from anaplan_orm.parsers import XMLStringParser, CSVStringParser
 
 class EmployeeRoster(AnaplanModel):
     EmployeeID: int
@@ -20,6 +21,8 @@ incoming_data = """
     </Row>
 </AnaplanExport>
 """
+
+# NOTE: XMLStringParser tests ###################################################################
 
 def test_xml_string_parser():
     # Arrange: Create an instance of the XMLStringParser
@@ -60,3 +63,28 @@ def test_to_csv_custom_separator():
     assert isinstance(csv_output, str)
     assert "EmployeeID|Department|Salary" in csv_output
     assert "101|Sales|75000.0" in csv_output
+
+# NOTE: CSVStringParser tests ###################################################################
+def test_csv_string_parser_success():
+    """Test that the parser correctly maps CSV headers to dictionary keys."""
+    csv_payload = "DEV_ID,DEV_NAME,DEV_AGE\n1001,Ada Love,35\n1002,Alan Turing,41"
+    
+    result = CSVStringParser.parse(csv_payload)
+    
+    assert len(result) == 2
+    assert result[0] == {"DEV_ID": "1001", "DEV_NAME": "Ada Love", "DEV_AGE": "35"}
+    assert result[1] == {"DEV_ID": "1002", "DEV_NAME": "Alan Turing", "DEV_AGE": "41"}
+
+def test_csv_string_parser_invalid_type():
+    """Test that the parser rejects non-string payloads."""
+    with pytest.raises(TypeError) as exc_info:
+        CSVStringParser.parse(["Not", "a", "string"])
+        
+    assert "Invalid Payload: Expected a string" in str(exc_info.value)
+
+def test_csv_string_parser_empty_string():
+    """Test that the parser rejects empty or whitespace-only strings."""
+    with pytest.raises(ValueError) as exc_info:
+        CSVStringParser.parse("   \n   ")
+        
+    assert "Cannot parse an empty CSV string" in str(exc_info.value)

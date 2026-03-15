@@ -1,3 +1,5 @@
+import csv
+import io
 from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
 
@@ -61,3 +63,43 @@ class XMLStringParser(DataParser):
             xml_elements.append(xml_dic)
 
         return xml_elements
+
+class CSVStringParser(DataParser):
+    """
+    A concrete implementation of DataParser designed to handle CSV data
+    embedded within a standard string, exactly as downloaded from Anaplan.
+    """
+
+    @classmethod
+    def parse(cls, csv_str_payload: str) -> list[dict]:
+        """
+        Extracts row data from a flat CSV string.
+
+        Args:
+            csv_str_payload (str): The raw CSV string downloaded from Anaplan.
+
+        Raises:
+            TypeError: If the payload is not a string.
+            ValueError: If the CSV string is empty or entirely whitespace.
+
+        Returns:
+            list[dict]: A list where each dictionary is a row, with CSV headers as keys
+                and column data as values.
+        """
+        if not isinstance(csv_str_payload, str):
+            raise TypeError("Invalid Payload: Expected a string.")
+            
+        if not csv_str_payload or not csv_str_payload.strip():
+            raise ValueError("Cannot parse an empty CSV string.")
+
+        # Use io.StringIO to turn the raw string into an in-memory file buffer
+        string_buffer = io.StringIO(csv_str_payload.strip())
+        
+        # Use csv.DictReader to automatically read the first row as headers 
+        # and map all subsequent rows to those header keys.
+        reader = csv.DictReader(string_buffer)
+        
+        # Convert the reader generator into a clean list of dictionaries
+        csv_elements = [row for row in reader]
+
+        return csv_elements

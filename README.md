@@ -64,6 +64,7 @@ client = AnaplanClient(authenticator=auth)
 # 3. Execute a request
 status = client.ping()
 ```
+---
 
 ## Quick Start: XML Parsing & Data Upload
 The `anaplan-orm` is designed to take raw XML strings (e.g., from MuleSoft or data pipeline payloads), validate them into Python objects, and stream them directly into Anaplan.
@@ -144,6 +145,8 @@ def run_pipeline():
 if __name__ == "__main__":
     run_pipeline()
 ```
+
+---
 
 ## ⬇️ Extracting Data (Outbound Pipeline)
 
