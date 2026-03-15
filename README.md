@@ -176,14 +176,14 @@ import httpx
 from anaplan_orm.parsers import JSONParser
 
 # 1. Fetch JSON from an external REST API (or read a local .json file)
-api_response = httpx.get("[https://api.mycompany.com/v1/employees](https://api.mycompany.com/v1/employees)").text
+api_response = httpx.get("https://api.mycompany.com/v1/employees").text
 
 # 2. Parse the JSON string (drilling into the "data" array)
 parser = JSONParser()
 employees = Employee.from_payload(
     payload=api_response, 
     parser=parser, 
-    # The ORM passes this directly to the parser!
+    # The ORM passes this key directly to the parser.
     data_key="data" 
 )
 
