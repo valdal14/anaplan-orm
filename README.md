@@ -150,17 +150,49 @@ if __name__ == "__main__":
 
 ## ⬇️ Extracting Data (Outbound Pipeline)
 
-You can easily trigger Anaplan Export Actions and stream the resulting datasets down to your local environment in sequential chunks, completely preventing OutOfMemory (OOM) crashes on massive enterprise files.
+`anaplan-orm` supports two distinct architectural patterns for extracting data, depending on your pipeline's requirements.
+
+### Option A: Pure Extract & Load (ELT)
+If your goal is simply to move data from Anaplan to a Data Lake (like AWS S3) to ingest later. You can stream the raw CSV text directly.
 
 ```python
-# 1. Trigger the background export action
+# 1. Trigger the export and wait for completion
 task_id = client.execute_export(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
-
-# 2. Poll Anaplan until the file is fully generated
 client.wait_for_export_completion(WORKSPACE_ID, MODEL_ID, EXPORT_ID, task_id)
 
-# 3. Stream the file down in chunks and assemble in memory
-csv_string = client.download_file_chunked(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
+# 2. Download the raw CSV string in chunks
+raw_csv_string = client.download_file_chunked(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
 
-print(f"Successfully downloaded {len(csv_string.encode('utf-8'))} bytes of raw data!")
+# 3. Write directly to a file (or upload to AWS S3 using boto3)
+with open("anaplan_export.csv", "w", encoding="utf-8") as f:
+    f.write(raw_csv_string)
+```
+
+### Option B: In-Flight Processing (The True ORM)
+
+If you need to validate data types, perform cross-column mathematical transformations, or mask sensitive PII before routing the data to another microservice, you can seamlessly inflate the CSV into strongly-typed Pydantic models.
+
+```python
+from pydantic import BaseModel, Field, ValidationError
+from anaplan_orm.parsers import CSVStringParser
+
+# Define your data contract
+class FinancialRow(BaseModel):
+    cost_center: str = Field(alias="Cost Center")
+    outlook_eur: float = Field(alias="Outlook in Local Currency")
+
+# 1. Parse the raw CSV string into a list of dictionaries
+parsed_rows = CSVStringParser.parse(raw_csv_string)
+
+# 2. Inflate and validate the Pydantic models
+valid_models = []
+for row in parsed_rows:
+    try:
+        valid_models.append(FinancialRow(**row))
+    except ValidationError as e:
+        print(f"Quarantined invalid row: {e}")
+
+# You now have a list of mathematically safe Python objects for an easy transformations 
+for model in valid_models:
+    model.outlook_eur = model.outlook_eur * 1.05
 ```
