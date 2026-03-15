@@ -1,7 +1,7 @@
 import pytest
 
 from anaplan_orm.models import AnaplanModel
-from anaplan_orm.parsers import CSVStringParser, XMLStringParser
+from anaplan_orm.parsers import CSVStringParser, JSONParser, XMLStringParser
 
 
 class EmployeeRoster(AnaplanModel):
@@ -97,3 +97,96 @@ def test_csv_string_parser_empty_string():
         CSVStringParser.parse("   \n   ")
 
     assert "Cannot parse an empty CSV string" in str(exc_info.value)
+
+
+# NOTE: JSONParser tests ########################################################################
+
+
+def test_json_parser_flat_list():
+    """Test that the parser handles a standard flat JSON array."""
+    json_payload = '[{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]'
+
+    result = JSONParser.parse(json_payload)
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[0]["name"] == "Alice"
+
+
+def test_json_parser_single_object():
+    """Test that a single JSON object is correctly wrapped in a list."""
+    json_payload = '{"id": 1, "name": "Alice"}'
+
+    result = JSONParser.parse(json_payload)
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert result[0]["name"] == "Alice"
+
+
+def test_json_parser_with_data_key():
+    """Test that the parser correctly extracts nested arrays using data_key."""
+    json_payload = '{"status": "success", "data": [{"id": 1}, {"id": 2}]}'
+
+    result = JSONParser.parse(json_payload, data_key="data")
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[1]["id"] == 2
+
+
+def test_json_parser_with_missing_data_key():
+    """Test that providing a data_key that doesn't exist returns an empty list safely."""
+    json_payload = '{"status": "success", "users": [{"id": 1}]}'
+
+    result = JSONParser.parse(json_payload, data_key="wrong_key")
+
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+
+def test_json_parser_invalid_type():
+    """Test that passing a non-string raises a TypeError."""
+    with pytest.raises(TypeError) as exc_info:
+        JSONParser.parse(["not", "a", "string"])
+
+    assert "Expected a string" in str(exc_info.value)
+
+
+def test_json_parser_empty_string():
+    """Test that empty or whitespace strings raise a ValueError."""
+    with pytest.raises(ValueError) as exc_info:
+        JSONParser.parse("   ")
+
+    assert "Cannot parse an empty JSON string" in str(exc_info.value)
+
+
+def test_json_parser_invalid_json():
+    """Test that malformed JSON strings are caught and raised gracefully."""
+    bad_json = '{"id": 1, "name": "Alice" '  # Missing closing brace
+
+    with pytest.raises(ValueError) as exc_info:
+        JSONParser.parse(bad_json)
+
+    assert "Failed to decode JSON payload" in str(exc_info.value)
+
+
+def test_json_parser_data_key_on_list():
+    """Test that asking for a data_key when the root is a list raises an error."""
+    flat_list_json = '[{"id": 1}]'
+
+    with pytest.raises(ValueError) as exc_info:
+        JSONParser.parse(flat_list_json, data_key="data")
+
+    assert "root is a list, not a dictionary" in str(exc_info.value)
+
+
+def test_json_parser_invalid_return_type():
+    """Test that JSON resolving to a primitive (like a string/bool) raises an error."""
+    # "true" is technically valid JSON, but it evaluates to a boolean, not a dict/list
+    bool_json = '"true"'
+
+    with pytest.raises(TypeError) as exc_info:
+        JSONParser.parse(bool_json)
+
+    assert "must result in a dictionary or a list" in str(exc_info.value)

@@ -10,14 +10,13 @@ class AnaplanModel(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")
 
     @classmethod
-    def from_payload(cls, payload: str, parser: DataParser) -> list["AnaplanModel"]:
+    def from_payload(cls, payload: str, parser: "DataParser", **kwargs) -> list["AnaplanModel"]:
         """
-        Ingests a raw payload using the injected parser, and converts
-        the resulting dictionaries into validated Pydantic models.
+        Ingests a raw payload, parses it into dictionaries using the provided parser,
+        and inflates them into validated Pydantic models.
         """
-        raw_dicts = parser.parse(payload)
-        validated_models = [cls(**row) for row in raw_dicts]
-        return validated_models
+        parsed_data = parser.parse(payload, **kwargs)
+        return [cls(**row) for row in parsed_data]
 
     @classmethod
     def to_csv(cls, instances: list["AnaplanModel"], separator: str = ",") -> str:

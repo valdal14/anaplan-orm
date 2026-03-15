@@ -148,6 +148,52 @@ if __name__ == "__main__":
 
 ---
 
+## Quick Start: JSON Parsing (REST APIs & Files)
+For modern web integrations or local file processing, `anaplan-orm` provides a native `JSONParser`. It gracefully handles both flat JSON arrays and nested API responses by allowing you to pass targeted extraction keys directly through your Pydantic model.
+
+### 1. Define Your Model
+```python
+from pydantic import Field
+from anaplan_orm.models import AnaplanModel
+
+class Employee(AnaplanModel):
+    emp_id: int = Field(alias="id")
+    email: str = Field(alias="emailAddress")
+    department: str = Field(alias="dept")
+```
+
+### 2. Parse and Upload
+If your JSON data is nested inside a metadata wrapper: I.E: 
+
+```json
+{"status": "success", "data": [...] }
+```
+
+Simply pass the data_key argument to the from_payload method. The ORM will safely drill down, extract the records, and inflate your models.
+
+```python
+import httpx
+from anaplan_orm.parsers import JSONParser
+
+# 1. Fetch JSON from an external REST API (or read a local .json file)
+api_response = httpx.get("[https://api.mycompany.com/v1/employees](https://api.mycompany.com/v1/employees)").text
+
+# 2. Parse the JSON string (drilling into the "data" array)
+parser = JSONParser()
+employees = Employee.from_payload(
+    payload=api_response, 
+    parser=parser, 
+    # The ORM passes this directly to the parser!
+    data_key="data" 
+)
+
+# 3. Convert to Anaplan CSV and Upload
+csv_data = Employee.to_csv(employees)
+client.upload_file_chunked(WORKSPACE_ID, MODEL_ID, FILE_ID, csv_data)
+```
+
+---
+
 ## ⬇️ Extracting Data (Outbound Pipeline)
 
 `anaplan-orm` supports two distinct architectural patterns for extracting data, depending on your pipeline's requirements.
