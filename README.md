@@ -144,3 +144,20 @@ def run_pipeline():
 if __name__ == "__main__":
     run_pipeline()
 ```
+
+## ⬇️ Extracting Data (Outbound Pipeline)
+
+You can easily trigger Anaplan Export Actions and stream the resulting datasets down to your local environment in sequential chunks, completely preventing OutOfMemory (OOM) crashes on massive enterprise files.
+
+```python
+# 1. Trigger the background export action
+task_id = client.execute_export(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
+
+# 2. Poll Anaplan until the file is fully generated
+client.wait_for_export_completion(WORKSPACE_ID, MODEL_ID, EXPORT_ID, task_id)
+
+# 3. Stream the file down in chunks and assemble in memory
+csv_string = client.download_file_chunked(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
+
+print(f"Successfully downloaded {len(csv_string.encode('utf-8'))} bytes of raw data!")
+```
