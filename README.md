@@ -145,6 +145,74 @@ def run_pipeline():
 if __name__ == "__main__":
     run_pipeline()
 ```
+---
+
+### Advanced: Deeply Nested XML Extraction
+If your XML payload is deeply nested or relies heavily on attributes (common with SOAP APIs), you can use Pydantic's json_schema_extra to define native XPath 1.0 mappings. The parser will automatically evaluate the XPath, extract both text nodes and attributes, and map them to your Anaplan aliases.
+
+```python
+from pydantic import Field
+from anaplan_orm.models import AnaplanModel
+
+class NestedXMLDeveloper(AnaplanModel):
+    # Use '@' to extract attributes
+    # Use '/' to navigate nested text nodes
+    dev_id: int = Field(
+        alias="DEV_ID", 
+        json_schema_extra={"path": "./EmployeeDetails/@empId"} 
+    )
+    dev_name: str = Field(
+        alias="DEV_NAME", 
+        json_schema_extra={"path": "./EmployeeDetails/Profile/FullName"} 
+    )
+```
+
+To extract the repeating rows from the document, simply pass the base XPath expression to the parser using the data_key argument:
+
+```python
+from anaplan_orm.parsers import XMLStringParser
+
+# The parser will find every <Employee> node, and apply your XPath mappings to it!
+developers = NestedXMLDeveloper.from_payload(
+    payload=raw_xml_string, 
+    parser=XMLStringParser(), 
+    data_key=".//Employee" 
+)
+```
+
+Below you can see the XML example used for the above example
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<EnterpriseExport status="success" timestamp="2026-03-16T08:00:00Z">
+    <EmployeeRecords>
+        <Employee status="active">
+            <EmployeeDetails empId="1001">
+                <Profile>
+                    <FullName>Ada Lovelace</FullName>
+                    <Age>36</Age>
+                </Profile>
+            </EmployeeDetails>
+            <Office>
+                <City>London</City>
+                <Region>EMEA</Region>
+            </Office>
+        </Employee>
+        <Employee status="active">
+            <EmployeeDetails empId="1002">
+                <Profile>
+                    <FullName>Grace Hopper</FullName>
+                    <Age>85</Age>
+                </Profile>
+            </EmployeeDetails>
+            <Office>
+                <City>New York</City>
+                <Region>NAMER</Region>
+            </Office>
+        </Employee>
+    </EmployeeRecords>
+</EnterpriseExport>
+```
 
 ---
 
