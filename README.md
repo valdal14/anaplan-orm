@@ -194,6 +194,36 @@ client.upload_file_chunked(WORKSPACE_ID, MODEL_ID, FILE_ID, csv_data)
 
 ---
 
+## Quick Start: SQL Databases (Relational Data to Anaplan)
+If your source data lives in a relational database (Snowflake, PostgreSQL, SQL Server), `anaplan-orm` provides an `SQLCursorParser`. This allows you to stream live database queries directly into Pydantic models without ever saving a CSV to disk.
+
+### 1. Execute your query and pass the cursor
+The parser accepts any standard DB-API 2.0 cursor object, dynamically extracts the column headers, and maps them to your model `aliases`.
+
+```python
+import psycopg2 # Or sqlite3, snowflake.connector, etc.
+from anaplan_orm.parsers import SQLCursorParser
+
+# 1. Connect to your database and execute a query
+conn = psycopg2.connect("dbname=enterprise user=admin password=secret")
+cursor = conn.cursor()
+cursor.execute("SELECT emp_id AS id, email_address, department FROM employees WHERE active = true")
+
+# 2. Pass the active cursor directly into the ORM
+employees = Employee.from_payload(
+    payload=cursor, 
+    parser=SQLCursorParser()
+)
+
+# 3. Convert to Anaplan CSV and Upload
+csv_data = Employee.to_csv(employees)
+client.upload_file_chunked(WORKSPACE_ID, MODEL_ID, FILE_ID, csv_data)
+
+conn.close()
+```
+
+--- 
+
 ## ⬇️ Extracting Data (Outbound Pipeline)
 
 `anaplan-orm` supports two distinct architectural patterns for extracting data, depending on your pipeline's requirements.
