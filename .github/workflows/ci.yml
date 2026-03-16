@@ -34,13 +34,13 @@ jobs:
         run: poetry lock
 
       - name: Install Dependencies
-        run: poetry install --no-interaction
+        run: poetry install --with dev --no-interaction
 
       - name: Run Linter (Ruff)
-        run: poetry run python3 -m ruff check .
+        rrun: poetry run ruff check .
 
       - name: Run Tests (Pytest)
-        run: poetry run python3 -m pytest
+        run: poetry run pytest
 
   # ---------------------------------------------------------
   # JOB 2: BUILD & PUBLISH (Runs ONLY on GitHub Releases)
