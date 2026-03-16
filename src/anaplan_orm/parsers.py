@@ -1,11 +1,11 @@
 import csv
 import io
 import json
-import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 from typing import Any
 
 import jmespath
+from lxml import etree
 
 
 class DataParser(ABC):
@@ -80,41 +80,78 @@ class CSVStringParser(DataParser):
 class XMLStringParser(DataParser):
     """
     A concrete implementation of DataParser designed to handle XML data
-    embedded within a standard string.
+    embedded within a standard string. Supports complex nested XPath extraction.
 
-    PRIMARY USE CASE: Inbound Pipelines (XML Source ➔ Anaplan).
+    PRIMARY USE CASE: Inbound Pipelines (SOAP API ➔ Anaplan).
     """
 
     @classmethod
-    def parse(cls, xml_str_payload: str, **kwargs) -> list[dict]:
+    def parse(cls, xml_str_payload: str, data_key: str = None, **kwargs) -> list[dict]:
         """
-        Extracts row data from a flat XML string.
+        Extracts row data from a flat or deeply nested XML string.
 
         Args:
-            xml_str_payload (str): The raw XML string. Must contain a root element
-                and child nodes representing rows of data.
+            xml_str_payload (str): The raw XML string.
+            data_key (str, optional): The XPath expression to locate the repeating
+                                      record nodes (e.g., ".//Row").
 
         Raises:
-            TypeError: If the payload is not a string or lacks a root element.
+            TypeError: If the payload is not a string.
+            ValueError: If the XML is empty or malformed.
 
         Returns:
-            list[dict]: A list where each dictionary is a row, with XML tags as keys
-                and XML text as values.
+            list[dict]: A list of flat dictionaries ready for Pydantic.
         """
-
         if not isinstance(xml_str_payload, str):
             raise TypeError("Invalid Payload: Expected a string.")
 
-        payload = ET.fromstring(xml_str_payload)
+        if not xml_str_payload or not xml_str_payload.strip():
+            raise ValueError("Cannot parse an empty XML string.")
+
+        # Safely load the XML string using lxml
+        try:
+            # Encode the string for lxml
+            root = etree.fromstring(xml_str_payload.encode("utf-8"))
+        except etree.XMLSyntaxError as e:
+            raise ValueError(f"Failed to decode XML payload: {str(e)}")
+
+        mapping = kwargs.get("mapping")
+
+        # Identify the repeating nodes (the "rows")
+        # If data_key is provided, use it as an XPath to find the records.
+        # Otherwise, assume the direct children of the root are the records.
+        records = root.xpath(data_key) if data_key else list(root)
+
+        # Nested extration logic
+        if mapping:
+            flattened_list = []
+            for record in records:
+                flat_row = {}
+                for target_column, xpath_expr in mapping.items():
+                    # Evaluate xpath relative to the current record node
+                    result = record.xpath(xpath_expr)
+
+                    if not result:
+                        flat_row[target_column] = None
+                    elif isinstance(result[0], str):
+                        # Result is a string (e.g., extracting an attribute via /@id)
+                        flat_row[target_column] = result[0].strip()
+                    elif hasattr(result[0], "text") and result[0].text:
+                        # Result is an Element, grab its inner text
+                        flat_row[target_column] = result[0].text.strip()
+                    else:
+                        flat_row[target_column] = None
+
+                flattened_list.append(flat_row)
+            return flattened_list
+
+        # Flat extraction logic or fallback for legacy/simple XML
         xml_elements = []
-
-        if payload.tag == "":
-            raise TypeError("No Root Element found")
-
-        for row in payload:
+        for row in records:
             xml_dic = {}
             for child in row:
-                xml_dic[child.tag] = child.text
+                # Use .tag for the dictionary key and .text for the value
+                xml_dic[child.tag] = child.text.strip() if child.text else None
             xml_elements.append(xml_dic)
 
         return xml_elements

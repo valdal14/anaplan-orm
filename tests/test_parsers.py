@@ -40,6 +40,60 @@ def test_xml_string_parser():
     assert len(roster) == 2
 
 
+def test_xml_parser_xpath_flat_extraction():
+    """Test that the parser handles simple, flat XML like the original parser did."""
+    xml_payload = """
+    <Export>
+        <Row><ID>1001</ID><Name>Ada</Name></Row>
+        <Row><ID>1002</ID><Name>Grace</Name></Row>
+    </Export>
+    """
+    # No mapping provided, so it uses the legacy flat extraction
+    result = XMLStringParser.parse(xml_payload, data_key=".//Row")
+
+    assert len(result) == 2
+    assert result[0] == {"ID": "1001", "Name": "Ada"}
+    assert result[1]["Name"] == "Grace"
+
+
+def test_xml_parser_xpath_deep_extraction():
+    """Test that XPath correctly extracts both nested text and element attributes."""
+    xml_payload = """
+    <EnterpriseData>
+        <EmployeeRecord region="EMEA">
+            <Details empId="1001">
+                <Profile><FullName>Ada Lovelace</FullName></Profile>
+            </Details>
+            <Office><City>London</City></Office>
+        </EmployeeRecord>
+    </EnterpriseData>
+    """
+    mapping = {
+        "DEV_ID": "./Details/@empId",  # Attribute extraction!
+        "DEV_NAME": "./Details/Profile/FullName",  # Nested text extraction!
+        "DEV_LOCATION": "./Office/City",
+        "REGION": "./@region",  # Root attribute extraction!
+    }
+
+    result = XMLStringParser.parse(xml_payload, data_key=".//EmployeeRecord", mapping=mapping)
+
+    assert len(result) == 1
+    assert result[0]["DEV_ID"] == "1001"
+    assert result[0]["DEV_NAME"] == "Ada Lovelace"
+    assert result[0]["DEV_LOCATION"] == "London"
+    assert result[0]["REGION"] == "EMEA"
+
+
+def test_xml_parser_invalid_xml():
+    """Test that malformed XML safely raises a ValueError."""
+    bad_xml = "<Export><Row>Unclosed tag</Export>"
+
+    with pytest.raises(ValueError) as exc_info:
+        XMLStringParser.parse(bad_xml)
+
+    assert "Failed to decode XML payload" in str(exc_info.value)
+
+
 def test_to_csv_serialization():
     # Arrange: Parse the data
     xml_parser = XMLStringParser()
