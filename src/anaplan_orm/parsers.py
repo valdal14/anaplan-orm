@@ -3,6 +3,7 @@ import io
 import json
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class DataParser(ABC):
@@ -14,12 +15,12 @@ class DataParser(ABC):
     """
 
     @abstractmethod
-    def parse(self, payload: str, **kwargs) -> list[dict]:
+    def parse(self, payload: Any, **kwargs) -> list[dict]:
         """
-        Parses a raw string payload into a list of dictionaries.
+        Parses a raw payload into a list of dictionaries.
 
         Args:
-            payload (str): The raw data string (e.g., XML, JSON) to be parsed.
+            payload (Any): The raw data (e.g., String, DB Cursor) to be parsed.
 
         Returns:
             list[dict]: A list of flat dictionaries representing the extracted rows.
@@ -39,7 +40,7 @@ class CSVStringParser(DataParser):
     """
 
     @classmethod
-    def parse(cls, csv_str_payload: str) -> list[dict]:
+    def parse(cls, csv_str_payload: str, **kwargs) -> list[dict]:
         """
         Extracts row data from a flat CSV string.
 
@@ -79,11 +80,11 @@ class XMLStringParser(DataParser):
     A concrete implementation of DataParser designed to handle XML data
     embedded within a standard string.
 
-    PRIMARY USE CASE: Inbound Pipelines
+    PRIMARY USE CASE: Inbound Pipelines (XML Source ➔ Anaplan).
     """
 
     @classmethod
-    def parse(cls, xml_str_payload: str) -> list[dict]:
+    def parse(cls, xml_str_payload: str, **kwargs) -> list[dict]:
         """
         Extracts row data from a flat XML string.
 
@@ -126,7 +127,7 @@ class JSONParser(DataParser):
     """
 
     @classmethod
-    def parse(cls, json_str_payload: str, data_key: str = None) -> list[dict]:
+    def parse(cls, json_str_payload: str, data_key: str = None, **kwargs) -> list[dict]:
         """
         Extracts row data from a JSON formatted string.
 
@@ -171,3 +172,47 @@ class JSONParser(DataParser):
             return parsed_data
         else:
             raise TypeError("Parsed JSON must result in a dictionary or a list of dictionaries.")
+
+
+class SQLCursorParser(DataParser):
+    """
+    A concrete implementation of DataParser designed to handle live database cursors.
+    
+    PRIMARY USE CASE: Inbound Pipelines (SQL Database ➔ Anaplan).
+    """
+    
+    @classmethod
+    def parse(cls, payload: Any, **kwargs) -> list[dict]:
+        """
+        Extracts row data from an active database cursor.
+
+        Args:
+            payload (Any): The database cursor object (e.g., from sqlite3, psycopg2, snowflake).
+                           Must have already executed a SELECT query.
+
+        Raises:
+            TypeError: If the payload is not a valid cursor object.
+            ValueError: If the cursor has no description (e.g., no query was executed).
+
+        Returns:
+            list[dict]: A list where each dictionary is a row of data, with column headers as keys.
+        """
+        cursor = payload
+
+        # Ensure it acts like a standard DB-API 2.0 cursor
+        if not hasattr(cursor, 'description') or not hasattr(cursor, 'fetchall'):
+            raise TypeError("Invalid Payload: Expected a database cursor object.")
+
+        # Check if a query was actually run
+        if cursor.description is None:
+            raise ValueError("Cursor has no description. Ensure a SELECT query was executed.")
+
+        # Extract the column headers from the cursor description
+        # description returns a tuple of tuples where the first item is the column name
+        columns = [column[0] for column in cursor.description]
+
+        # Fetch all the raw row tuples
+        rows = cursor.fetchall()
+
+        # Zip the headers and the rows together into dictionaries
+        return [dict(zip(columns, row)) for row in rows]
