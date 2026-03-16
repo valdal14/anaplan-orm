@@ -194,6 +194,28 @@ client.upload_file_chunked(WORKSPACE_ID, MODEL_ID, FILE_ID, csv_data)
 
 ---
 
+### Advanced: Deeply Nested JSON Extraction
+If your API returns a deeply nested JSON response, you do not need to write custom flattening loops. Simply use Pydantic's `json_schema_extra` to define a [JMESPath](https://jmespath.org/) mapping. The ORM will automatically traverse the JSON tree, extract the value, and assign it to the correct Anaplan column (`alias`).
+
+```python
+from pydantic import Field
+from anaplan_orm.models import AnaplanModel
+
+class NestedEmployee(AnaplanModel):
+    # 'alias' is the Anaplan CSV column's name. 
+    # 'path' is where to find the data in the JSON.
+    emp_id: int = Field(
+        alias="DEV_ID", 
+        json_schema_extra={"path": "employeeDetails.empId"}
+    )
+    city: str = Field(
+        alias="LOCATION", 
+        json_schema_extra={"path": "office.address.city"}
+    )
+```
+
+---
+
 ## Quick Start: SQL Databases (Relational Data to Anaplan)
 If your source data lives in a relational database (Snowflake, PostgreSQL, SQL Server), `anaplan-orm` provides an `SQLCursorParser`. This allows you to stream live database queries directly into Pydantic models without ever saving a CSV to disk.
 

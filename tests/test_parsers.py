@@ -1,7 +1,9 @@
-import pytest
-from anaplan_orm.models import AnaplanModel
-from anaplan_orm.parsers import CSVStringParser, JSONParser, XMLStringParser, SQLCursorParser
 from unittest.mock import MagicMock
+
+import pytest
+
+from anaplan_orm.models import AnaplanModel
+from anaplan_orm.parsers import CSVStringParser, JSONParser, SQLCursorParser, XMLStringParser
 
 
 class EmployeeRoster(AnaplanModel):
@@ -192,7 +194,61 @@ def test_json_parser_invalid_return_type():
     assert "must result in a dictionary or a list" in str(exc_info.value)
 
 
+def test_json_parser_jmespath_flat_extraction():
+    """Test that JMESPath mapping works on a flat dictionary."""
+    json_payload = '{"id": 1, "name": "Alice"}'
+    mapping = {"DEV_ID": "id", "DEV_NAME": "name"}
+
+    result = JSONParser.parse(json_payload, mapping=mapping)
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert result[0] == {"DEV_ID": 1, "DEV_NAME": "Alice"}
+
+
+def test_json_parser_jmespath_deep_extraction():
+    """Test that JMESPath correctly traverses deeply nested structures."""
+    json_payload = """
+    [
+        {
+            "employee": {"details": {"emp_id": 1001, "full_name": "Ada"}},
+            "location": {"city": "London"}
+        }
+    ]
+    """
+    mapping = {
+        "DEV_ID": "employee.details.emp_id",
+        "DEV_NAME": "employee.details.full_name",
+        "DEV_LOCATION": "location.city",
+    }
+
+    result = JSONParser.parse(json_payload, mapping=mapping)
+
+    assert len(result) == 1
+    assert result[0]["DEV_ID"] == 1001
+    assert result[0]["DEV_NAME"] == "Ada"
+    assert result[0]["DEV_LOCATION"] == "London"
+
+
+def test_json_parser_jmespath_missing_keys():
+    """Test that missing keys in the JSON return None gracefully without crashing."""
+    json_payload = '[{"employee": {"details": {"emp_id": 1001}}}]'
+    # "full_name" and "location" are missing from the payload
+    mapping = {
+        "DEV_ID": "employee.details.emp_id",
+        "DEV_NAME": "employee.details.full_name",
+        "DEV_LOCATION": "location.city",
+    }
+
+    result = JSONParser.parse(json_payload, mapping=mapping)
+
+    assert result[0]["DEV_ID"] == 1001
+    assert result[0]["DEV_NAME"] is None
+    assert result[0]["DEV_LOCATION"] is None
+
+
 # NOTE: SQLCursorParser tests ###################################################################
+
 
 def test_sql_cursor_parser_happy_path():
     """Test that the parser correctly zips cursor descriptions and fetched rows."""
@@ -200,37 +256,36 @@ def test_sql_cursor_parser_happy_path():
     mock_cursor = MagicMock()
     # description is a tuple of tuples: (column_name, type_code, display_size, etc...)
     mock_cursor.description = (("DEV_ID", None), ("DEV_NAME", None), ("DEV_AGE", None))
-    mock_cursor.fetchall.return_value = [
-        (1001, "Ada Lovelace", 36),
-        (1002, "Grace Hopper", 85)
-    ]
-    
+    mock_cursor.fetchall.return_value = [(1001, "Ada Lovelace", 36), (1002, "Grace Hopper", 85)]
+
     # Parse the mock cursor
     result = SQLCursorParser.parse(mock_cursor)
-    
+
     # Assert it created perfect dictionaries
     assert isinstance(result, list)
     assert len(result) == 2
     assert result[0] == {"DEV_ID": 1001, "DEV_NAME": "Ada Lovelace", "DEV_AGE": 36}
     assert result[1]["DEV_NAME"] == "Grace Hopper"
 
+
 def test_sql_cursor_parser_invalid_object():
     """Test that passing a non-cursor object raises a TypeError."""
     # Passing the query string instead of the cursor
     bad_payload = "SELECT * FROM users"
-    
+
     with pytest.raises(TypeError) as exc_info:
         SQLCursorParser.parse(bad_payload)
-        
+
     assert "Expected a database cursor object" in str(exc_info.value)
+
 
 def test_sql_cursor_parser_no_description():
     """Test that a cursor without a description (e.g., no query executed) raises an error."""
     mock_cursor = MagicMock()
     # Happens if you run an UPDATE/INSERT or haven't executed yet
-    mock_cursor.description = None 
-    
+    mock_cursor.description = None
+
     with pytest.raises(ValueError) as exc_info:
         SQLCursorParser.parse(mock_cursor)
-        
+
     assert "Cursor has no description" in str(exc_info.value)

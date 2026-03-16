@@ -5,6 +5,8 @@ import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 from typing import Any
 
+import jmespath
+
 
 class DataParser(ABC):
     """
@@ -120,52 +122,55 @@ class XMLStringParser(DataParser):
 
 class JSONParser(DataParser):
     """
-    A concrete implementation of DataParser designed to handle JSON data
-    embedded within a standard string.
+    A concrete implementation of DataParser designed to handle JSON data.
+    Supports complex nested extraction via JMESPath mappings.
 
     PRIMARY USE CASE: Inbound Pipelines (REST API ➔ Anaplan).
     """
 
     @classmethod
     def parse(cls, json_str_payload: str, data_key: str = None, **kwargs) -> list[dict]:
-        """
-        Extracts row data from a JSON formatted string.
-
-        Args:
-            json_str_payload (str): The raw JSON string.
-            data_key (str, optional): The key to extract if the array of records
-                                      is nested inside a root JSON object.
-
-        Raises:
-            TypeError: If the payload is not a string.
-            ValueError: If the payload is empty or invalid JSON.
-
-        Returns:
-            list[dict]: A list where each dictionary is a row of data.
-        """
         if not isinstance(json_str_payload, str):
             raise TypeError("Invalid Payload: Expected a string.")
 
         if not json_str_payload or not json_str_payload.strip():
             raise ValueError("Cannot parse an empty JSON string.")
 
-        # Load the JSON string
+        # Safely load the JSON string
         try:
             parsed_data = json.loads(json_str_payload)
         except json.JSONDecodeError as e:
             raise ValueError(f"Failed to decode JSON payload: {str(e)}")
 
-        # Extract nested data if a data_key is requested
+        # Isolate the core data array if a data_key wrapper is provided
         if data_key is not None:
             if isinstance(parsed_data, dict):
-                # Use .get() safely, defaulting to an empty list if the key doesn't exist
                 parsed_data = parsed_data.get(data_key, [])
             else:
                 raise ValueError(
                     f"Cannot extract data_key '{data_key}' because the JSON root is a list, not a dictionary."
                 )
 
-        # Ensure the return type is strictly a list[dict]
+        # Hadle nested extraction logic
+        mapping = kwargs.get("mapping")
+
+        if mapping:
+            # If the developer provided a mapping flatten the data
+            flattened_list = []
+
+            # iterating over a list of records
+            records_to_process = parsed_data if isinstance(parsed_data, list) else [parsed_data]
+
+            for record in records_to_process:
+                flat_row = {}
+                for target_column, json_path in mapping.items():
+                    # jmespath.search navigates the dict. Returns None if the path doesn't exist.
+                    flat_row[target_column] = jmespath.search(json_path, record)
+                flattened_list.append(flat_row)
+
+            return flattened_list
+
+        # Flat extraction logic and fallback if no mapping is provided
         if isinstance(parsed_data, dict):
             return [parsed_data]
         elif isinstance(parsed_data, list):
@@ -177,10 +182,10 @@ class JSONParser(DataParser):
 class SQLCursorParser(DataParser):
     """
     A concrete implementation of DataParser designed to handle live database cursors.
-    
+
     PRIMARY USE CASE: Inbound Pipelines (SQL Database ➔ Anaplan).
     """
-    
+
     @classmethod
     def parse(cls, payload: Any, **kwargs) -> list[dict]:
         """
@@ -200,7 +205,7 @@ class SQLCursorParser(DataParser):
         cursor = payload
 
         # Ensure it acts like a standard DB-API 2.0 cursor
-        if not hasattr(cursor, 'description') or not hasattr(cursor, 'fetchall'):
+        if not hasattr(cursor, "description") or not hasattr(cursor, "fetchall"):
             raise TypeError("Invalid Payload: Expected a database cursor object.")
 
         # Check if a query was actually run
