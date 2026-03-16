@@ -34,7 +34,7 @@ jobs:
         run: poetry lock
 
       - name: Install Dependencies
-        run: poetry install --with dev --no-interaction
+        run: poetry install --no-interaction
 
       - name: Run Linter (Ruff)
         run: poetry run ruff check .
