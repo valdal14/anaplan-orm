@@ -37,7 +37,7 @@ jobs:
         run: poetry install --with dev --no-interaction
 
       - name: Run Linter (Ruff)
-        rrun: poetry run ruff check .
+        run: poetry run ruff check .
 
       - name: Run Tests (Pytest)
         run: poetry run pytest
