@@ -7,12 +7,12 @@
 A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).
 
 ## Current Status
-🚀 **Active Beta** 🚀
-Core data transformation, parsing engine, and Anaplan chunked API client are complete.
+🚀 **Active Beta (v0.2.0)** 🚀
+Core data transformation, parsing engine, chunked Anaplan API client, and custom strict-type validators are complete.
 
 ## 🌟 Features
-
 * **Pydantic Data Ingestion:** Validates and maps Python objects to Anaplan models effortlessly.
+* **Custom Anaplan Types:** Built-in `AnaplanDate` and `AnaplanBoolean` automatically sanitize and strictly format Python native types (like `datetime.date` or `True/False`) into the exact string formats required by Anaplan's API.
 * **Enterprise Security:** Supports standard Basic Authentication and Anaplan's proprietary RSA-SHA512 Certificate-based Authentication (mTLS).
 * **Resilient Networking:** Built-in exponential backoff, automated retries to protect against dropped packets, and mid-flight authentication token refreshing for massive, long-running pipelines.
 * **Massive Payloads:** Automatically handles chunked file uploads for multi-megabyte/gigabyte datasets without memory crashes.
@@ -313,6 +313,36 @@ conn.close()
 ```
 
 --- 
+
+## 🧰 Custom Anaplan Data Types (Sanitization)
+
+The Anaplan API is notoriously strict about data formats during imports. A standard Python `datetime` object or a boolean `True` will cause a silent rejection if Anaplan expects `"YYYY-MM-DD"` or `"true"`. 
+
+`anaplan-orm` provides custom Pydantic types that act as an automatic translation layer. They accept highly flexible Python inputs and strictly serialize them for Anaplan.
+
+```python
+from datetime import date
+from pydantic import BaseModel
+from anaplan_orm.types import AnaplanDate, AnaplanBoolean
+
+class EmployeeRow(BaseModel):
+    emp_id: int
+    is_active: AnaplanBoolean
+    start_date: AnaplanDate
+
+# The ORM is highly forgiving with inputs:
+row_1 = EmployeeRow(emp_id=1, is_active="Yes", start_date="2026-03-19")
+row_2 = EmployeeRow(emp_id=2, is_active=True, start_date=date(2026, 4, 12))
+
+# But it strictly serializes for the Anaplan API:
+print(row_1.model_dump()) 
+# {'emp_id': 1, 'is_active': 'true', 'start_date': '2026-03-19'}
+
+print(row_2.model_dump())
+# {'emp_id': 2, 'is_active': 'true', 'start_date': '2026-04-12'}
+```
+
+---
 
 ## ⬇️ Extracting Data (Outbound Pipeline)
 
