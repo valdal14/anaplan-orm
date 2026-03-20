@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from functools import wraps
@@ -70,6 +71,37 @@ def retry_network_errors(max_retries: int = 3, base_delay: float = 1.0):
                         f"Network error encountered ({str(http_error)}). Retrying in {delay} seconds..."
                     )
                     time.sleep(delay)
+
+        return wrapper
+
+    return decorator
+
+
+def async_retry_network_errors(max_retries: int = 3, backoff_factor: float = 2.0):
+    """
+    Asynchronous decorator to automatically retry failed network requests.
+    Uses asyncio.sleep to prevent blocking the event loop.
+    """
+
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    return await func(*args, **kwargs)
+                except httpx.HTTPError as e:
+                    retries += 1
+                    if retries >= max_retries:
+                        logger.error(f"Max retries reached for {func.__name__}. Failing.")
+                        raise
+
+                    sleep_time = backoff_factor**retries
+                    logger.warning(
+                        f"Network error in {func.__name__}: {str(e)}. "
+                        f"Retrying in {sleep_time} seconds..."
+                    )
+                    await asyncio.sleep(sleep_time)
 
         return wrapper
 

@@ -147,6 +147,97 @@ if __name__ == "__main__":
 ```
 ---
 
+## 📤 Upload Strategies (Which one should I use?)
+
+`anaplan-orm` provides three distinct methods for streaming data into Anaplan. Whether you are uploading a tiny configuration table or a 2-Gigabyte daily transaction ledger, there is a method optimized for your pipeline.
+
+### 1. The Fast Path (`upload_file`)
+**Best for:** Small datasets, dimension updates, or configuration files (**< 10 MB**).
+**How it works:** Executes a single, synchronous `PUT` request. It has zero overhead and is the absolute fastest way to get small amounts of data into Anaplan.
+
+```python
+# Uploads the entire CSV in one shot
+client.upload_file(
+    workspace_id="YOUR_WORKSPACE_ID", 
+    model_id="YOUR_MODEL_ID", 
+    file_id="YOUR_FILE_ID", 
+    csv_data=csv_data
+)
+```
+
+### 2. The Heavy Lifter (upload_file_chunked)
+Best for: Medium-to-Large datasets (10 MB - 100 MB) or pipelines running in strictly synchronous, memory-constrained environments (like basic AWS Lambda functions).
+How it works: Synchronously splits your CSV string into pieces (chunks) and uploads them one by one. This bypasses Anaplan's single-request timeout limits and guarantees safe delivery over unstable networks by retrying failed chunks individually.
+
+```python
+# Uploads sequentially, one 10MB chunk at a time
+client.upload_file_chunked(
+    workspace_id="YOUR_WORKSPACE_ID", 
+    model_id="YOUR_MODEL_ID", 
+    file_id="YOUR_FILE_ID", 
+    csv_data=csv_data,
+    chunk_size_mb=10 
+)
+```
+
+### 3. The Turbocharger (upload_file_chunked_async) 🚀
+Best for: Massive Enterprise Datasets (100 MB to Multi-Gigabyte) and time-critical pipelines.
+How it works: Utilizes Python's asyncio to blast multiple file chunks to the Anaplan server simultaneously. It includes a built-in Semaphore (default: 5 concurrent connections) to completely saturate your network bandwidth without triggering Anaplan's 429 Too Many Requests rate limits or crashing their backend database.
+
+*Note: For files larger than 500MB, we recommend increasing the `chunk_size_mb` to 25 or 50 to reduce HTTP overhead. As per the [Official Anaplan API Documentation](https://help.anaplan.com/upload-a-text-or-csv-file-db641832-285c-41f7-a2e3-459859cb065e), the permitted data chunk size is strictly "between 1 to 50 MB".*
+
+```python
+import asyncio
+from anaplan_orm.client import AnaplanClient
+
+async def massive_upload_pipeline():
+    # Initialize your client
+    client = AnaplanClient(authenticator=auth)
+    
+    # Await the async upload
+    await client.upload_file_chunked_async(
+        workspace_id="YOUR_WORKSPACE_ID", 
+        model_id="YOUR_MODEL_ID", 
+        file_id="YOUR_FILE_ID", 
+        csv_data=gigantic_csv_string,
+         # Slice the file into 25MB pieces
+        chunk_size_mb=25,
+        # Upload 5 pieces at the exact same time            
+        max_concurrent_uploads=5      
+    )
+
+# Execute the async event loop
+asyncio.run(massive_upload_pipeline())
+```
+
+---
+
+## ⏱️ Handling Massive Imports (Polling Configuration)
+
+When you trigger an Anaplan process (`execute_process`), Anaplan processes the data asynchronously on its own servers. Your script must actively poll the API to know when the job finishes. 
+
+For small files, the default polling limits are fine. However, **for massive datasets (100MB+), Anaplan may take several minutes to ingest the data.** You must adjust the `retry` and `poll_interval` parameters to give Anaplan enough time to finish without your Python script timing out.
+
+```python
+# Start the import process
+task_id = client.execute_process(WORKSPACE_ID, MODEL_ID, PROCESS_ID)
+
+# For a 500MB+ file, configure a patient polling strategy
+# Example: 120 retries * 10 seconds = 20 minutes maximum wait time
+status = client.wait_for_process_completion(
+    workspace_id=WORKSPACE_ID, 
+    model_id=MODEL_ID, 
+    process_id=PROCESS_ID, 
+    task_id=task_id,
+    # Increase the number of checks
+    retry=120,    
+    # Wait 10 seconds between each check
+    poll_interval=10
+)
+```
+
+---
+
 ### Advanced: Deeply Nested XML Extraction
 If your XML payload is deeply nested or relies heavily on attributes (common with SOAP APIs), you can use Pydantic's json_schema_extra to define native XPath 1.0 mappings. The parser will automatically evaluate the XPath, extract both text nodes and attributes, and map them to your Anaplan aliases.
 

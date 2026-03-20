@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -5,7 +6,7 @@ import httpx
 
 from anaplan_orm.authenticator import Authenticator
 from anaplan_orm.exceptions import AnaplanConnectionError
-from anaplan_orm.utils import retry_network_errors
+from anaplan_orm.utils import async_retry_network_errors, retry_network_errors
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,8 @@ class AnaplanClient:
 
     # Anaplan's base API URL
     BASE_URL = "https://api.anaplan.com/2/0"
+    # Standard Megabyte conversion constant
+    MB_TO_BYTES = 1024 * 1024
 
     def __init__(
         self, authenticator: Authenticator, verify_ssl: bool = True, timeout: float = 30.0
@@ -33,7 +36,8 @@ class AnaplanClient:
             timeout: change default 5.0 httpx default timeout
         """
         self.authenticator = authenticator
-        # Create a reusable HTTP session for performance
+        self.timeout = timeout
+        self.verify_ssl = verify_ssl
         self.http_client = httpx.Client(base_url=self.BASE_URL, verify=verify_ssl, timeout=timeout)
 
     @retry_network_errors()
@@ -223,19 +227,19 @@ class AnaplanClient:
         Raises:
             AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
         """
-        # --- STEP 1: Initialise the partial upload stream ---
+        # --- Initialise the partial upload stream ---
         headers = self.authenticator.get_auth_headers()
         headers["Content-Type"] = "application/json"
 
         init_url_path = self._upload_file_url_builder(workspace_id, model_id, file_id)
 
         try:
-            # --- STEP 2: Send the initial request for chunks upload
+            # --- Send the initial request for chunks upload
             self._initialize_chunked_upload(init_url_path, headers)
 
-            # --- STEP 3: Slice and Stream the bytes to Anaplan ---
+            # --- Slice and Stream the bytes to Anaplan ---
             byte_data = csv_data.encode("utf-8")
-            chunk_size_bytes = chunk_size_mb * 1024 * 1024
+            chunk_size_bytes = chunk_size_mb * self.MB_TO_BYTES
             total_bytes = len(byte_data)
 
             for i in range(0, total_bytes, chunk_size_bytes):
@@ -252,7 +256,7 @@ class AnaplanClient:
 
             logger.info("Uploading Chunks Process Completed. Finalizing...")
 
-            # --- STEP 4: Post the final request to inform the partial upload has completed ---
+            # --- Post the final request to inform the partial upload has completed ---
             complete_url = self._file_complete_url_builder(workspace_id, model_id, file_id)
             complete_headers = self.authenticator.get_auth_headers()
             complete_headers["Content-Type"] = "application/json"
@@ -280,6 +284,99 @@ class AnaplanClient:
         """Isolated helper to send the final request for chunks upload, protected by retries."""
         response = self.http_client.post(url, headers=headers, json={"id": file_id})
         response.raise_for_status()
+
+    async def upload_file_chunked_async(
+        self,
+        workspace_id: str,
+        model_id: str,
+        file_id: str,
+        csv_data: str,
+        chunk_size_mb: int = 10,
+        max_concurrent_uploads: int = 5,
+    ) -> None:
+        """
+        Uploads a massive CSV string to Anaplan asynchronously.
+
+        Utilizes an asyncio.Semaphore to throttle concurrent connections, preventing
+        the Anaplan API from returning 429 Too Many Requests while maximizing throughput.
+        """
+
+        byte_data = csv_data.encode("utf-8")
+        chunk_size_bytes = chunk_size_mb * self.MB_TO_BYTES
+        total_bytes = len(byte_data)
+
+        # Concurrency Gatekeeper
+        semaphore = asyncio.Semaphore(max_concurrent_uploads)
+
+        # Define the isolated async worker task
+        @async_retry_network_errors()
+        async def _upload_single_chunk_async(
+            async_client: httpx.AsyncClient,
+            chunk_url: str,
+            chunk_headers: dict,
+            chunk_bytes: bytes,
+            chunk_id: str,
+        ):
+            # The semaphore ensures only max_concurrent_uploads (5 by default) of these blocks can run simultaneously
+            async with semaphore:
+                logger.info(f"Async: Uploading Chunk {chunk_id} for file {file_id}...")
+                response = await async_client.put(
+                    chunk_url, headers=chunk_headers, content=chunk_bytes
+                )
+                response.raise_for_status()
+
+        # Execute the Async Pipeline by spinnin up an ephemeral AsyncClient
+        async with httpx.AsyncClient(
+            base_url=self.BASE_URL, timeout=self.timeout, verify=self.verify_ssl
+        ) as async_client:
+            try:
+                init_url = self._upload_file_url_builder(workspace_id, model_id, file_id)
+                init_headers = self.authenticator.get_auth_headers()
+                init_headers["Content-Type"] = "application/json"
+
+                init_resp = await async_client.post(
+                    init_url, headers=init_headers, json={"chunkCount": -1}
+                )
+                init_resp.raise_for_status()
+
+                # Prepare Tasks
+                tasks = []
+                for i in range(0, total_bytes, chunk_size_bytes):
+                    chunk = byte_data[i : i + chunk_size_bytes]
+                    chunk_id = str(i // chunk_size_bytes)
+
+                    chunk_url = self._file_chunk_url_builder(
+                        workspace_id, model_id, file_id, chunk_id
+                    )
+                    chunk_headers = self.authenticator.get_auth_headers()
+                    chunk_headers["Content-Type"] = "application/octet-stream"
+
+                    # Add to our list of coroutines (they don't start executing yet)
+                    tasks.append(
+                        _upload_single_chunk_async(
+                            async_client, chunk_url, chunk_headers, chunk, chunk_id
+                        )
+                    )
+
+                logger.info(
+                    f"Firing {len(tasks)} chunks asynchronously (Max concurrency: {max_concurrent_uploads})..."
+                )
+                await asyncio.gather(*tasks)
+
+                logger.info("Async Uploading Chunks Completed. Finalizing...")
+                complete_url = self._file_complete_url_builder(workspace_id, model_id, file_id)
+                complete_headers = self.authenticator.get_auth_headers()
+                complete_headers["Content-Type"] = "application/json"
+
+                complete_resp = await async_client.post(
+                    complete_url, headers=complete_headers, json={"id": file_id}
+                )
+                complete_resp.raise_for_status()
+
+            except httpx.HTTPError as e:
+                raise AnaplanConnectionError(
+                    f"Failed during async chunked upload process: {str(e)}"
+                ) from e
 
     # NOTE: Method used to exports/downloads From Anaplan ##############################################################################
     @retry_network_errors()
