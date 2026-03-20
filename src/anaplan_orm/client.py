@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 
+import aiofiles
 import httpx
 
 from anaplan_orm.authenticator import Authenticator
@@ -299,6 +300,17 @@ class AnaplanClient:
 
         Utilizes an asyncio.Semaphore to throttle concurrent connections, preventing
         the Anaplan API from returning 429 Too Many Requests while maximizing throughput.
+
+        Args:
+            workspace_id (str): The Anaplan workspace ID.
+            model_id (str): The Anaplan destination model ID.
+            file_id (str): The specific file ID in Anaplan.
+            csv_data (str): The massive CSV string payload to be uploaded.
+            chunk_size_mb (int, optional): The size of each upload chunk in Megabytes. Defaults to 10.
+            max_concurrent_uploads (int, optional): The maximum number of simultaneous HTTP requests. Defaults to 5.
+
+        Raises:
+            AnaplanConnectionError: If a network connection fails or Anaplan rejects the upload.
         """
 
         byte_data = csv_data.encode("utf-8")
@@ -376,6 +388,141 @@ class AnaplanClient:
             except httpx.HTTPError as e:
                 raise AnaplanConnectionError(
                     f"Failed during async chunked upload process: {str(e)}"
+                ) from e
+
+    async def upload_file_streaming_async(
+        self,
+        workspace_id: str,
+        model_id: str,
+        file_id: str,
+        file_path: str,
+        chunk_size_mb: int = 25,
+        max_concurrent_uploads: int = 5,
+    ) -> None:
+        """
+        Streams a massive CSV file directly from the local disk to Anaplan asynchronously.
+
+        Utilizes an asyncio.Queue to create a Producer-Consumer pipeline. This guarantees
+        a flat, extremely low memory footprint regardless of the total file size, making
+        it safe for multi-gigabyte uploads on memory-constrained systems.
+
+        Args:
+            workspace_id (str): The Anaplan workspace ID.
+            model_id (str): The Anaplan destination model ID.
+            file_id (str): The specific file ID in Anaplan.
+            file_path (str): The absolute or relative path to the local CSV file to be uploaded.
+            chunk_size_mb (int, optional): The size of each upload chunk in Megabytes. Defaults to 25.
+            max_concurrent_uploads (int, optional): The maximum number of simultaneous HTTP requests. Defaults to 5.
+
+        Raises:
+            AnaplanConnectionError: If a network connection fails, the file cannot be read, or Anaplan rejects the upload.
+        """
+        from anaplan_orm.utils import async_retry_network_errors
+
+        chunk_size_bytes = chunk_size_mb * self.MB_TO_BYTES
+
+        async with httpx.AsyncClient(
+            base_url=self.BASE_URL, timeout=self.timeout, verify=self.verify_ssl
+        ) as async_client:
+            try:
+                # Initialize Upload
+                init_url = self._upload_file_url_builder(workspace_id, model_id, file_id)
+                init_headers = self.authenticator.get_auth_headers()
+                init_headers["Content-Type"] = "application/json"
+
+                init_resp = await async_client.post(
+                    init_url, headers=init_headers, json={"chunkCount": -1}
+                )
+                init_resp.raise_for_status()
+
+                # Instanciate the queue
+                queue = asyncio.Queue(maxsize=max_concurrent_uploads * 2)
+
+                # Decoupled Isolated Chunk Uploader
+                @async_retry_network_errors()
+                async def _upload_single_chunk(
+                    chunk_url: str, chunk_headers: dict, chunk_bytes: bytes
+                ):
+                    response = await async_client.put(
+                        chunk_url, headers=chunk_headers, content=chunk_bytes
+                    )
+                    response.raise_for_status()
+
+                # Define the Consumer
+                async def _upload_worker(worker_id: int):
+                    while True:
+                        item = await queue.get()
+
+                        if item is None:
+                            queue.task_done()
+                            break
+
+                        chunk_id, chunk_bytes = item
+                        try:
+                            logger.info(
+                                f"Worker {worker_id}: Streaming Chunk {chunk_id} to Anaplan..."
+                            )
+                            chunk_url = self._file_chunk_url_builder(
+                                workspace_id, model_id, file_id, str(chunk_id)
+                            )
+                            chunk_headers = self.authenticator.get_auth_headers()
+                            chunk_headers["Content-Type"] = "application/octet-stream"
+
+                            await _upload_single_chunk(chunk_url, chunk_headers, chunk_bytes)
+                        finally:
+                            # ALWAYS mark the task done, even if it crashed
+                            queue.task_done()
+
+                # Define the Producer (read from disk)
+                async def _file_reader():
+                    chunk_index = 0
+                    async with aiofiles.open(file_path, mode="rb") as f:
+                        while True:
+                            chunk = await f.read(chunk_size_bytes)
+                            if not chunk:
+                                break
+
+                            await queue.put((chunk_index, chunk))
+                            chunk_index += 1
+
+                    for _ in range(max_concurrent_uploads):
+                        await queue.put(None)
+
+                # Execute and Monitor Pipeline
+                logger.info(f"Initiating Infinite Stream from disk: {file_path}")
+
+                producer_task = asyncio.create_task(_file_reader())
+                consumer_tasks = [
+                    asyncio.create_task(_upload_worker(i)) for i in range(max_concurrent_uploads)
+                ]
+
+                all_tasks = [producer_task] + consumer_tasks
+
+                # The Circuit Breaker: Wait for completion, but ABORT IMMEDIATELY if any task crashes
+                done, pending = await asyncio.wait(all_tasks, return_when=asyncio.FIRST_EXCEPTION)
+
+                # Check for errors and fail fast
+                for task in done:
+                    if task.exception():
+                        # Cancel all pending worker tasks to prevent memory leaks
+                        for p in pending:
+                            p.cancel()
+                        raise task.exception()
+
+                # Finalize Upload
+                logger.info("Streaming Upload Completed. Finalizing...")
+                complete_url = self._file_complete_url_builder(workspace_id, model_id, file_id)
+                complete_headers = self.authenticator.get_auth_headers()
+                complete_headers["Content-Type"] = "application/json"
+
+                complete_resp = await async_client.post(
+                    complete_url, headers=complete_headers, json={"id": file_id}
+                )
+                complete_resp.raise_for_status()
+
+            except httpx.HTTPError as e:
+                raise AnaplanConnectionError(
+                    f"Failed during async streaming upload process: {str(e)}"
                 ) from e
 
     # NOTE: Method used to exports/downloads From Anaplan ##############################################################################

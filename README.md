@@ -16,6 +16,7 @@ Core data transformation, parsing engine, chunked Anaplan API client, and custom
 * **Enterprise Security:** Supports standard Basic Authentication and Anaplan's proprietary RSA-SHA512 Certificate-based Authentication (mTLS).
 * **Resilient Networking:** Built-in exponential backoff, automated retries to protect against dropped packets, and mid-flight authentication token refreshing for massive, long-running pipelines.
 * **Massive Payloads:** Automatically handles chunked file uploads for multi-megabyte/gigabyte datasets without memory crashes.
+* **Infinite Disk Streaming:** Utilizes `aiofiles` and an asynchronous bounded Producer-Consumer queue to stream multi-gigabyte files directly from disk to Anaplan with a flat, near-zero memory footprint.
 * **Smart Polling:** Asynchronous process execution with configurable, patient polling for long-running database transactions.
 
 ---
@@ -149,7 +150,7 @@ if __name__ == "__main__":
 
 ## 📤 Upload Strategies (Which one should I use?)
 
-`anaplan-orm` provides three distinct methods for streaming data into Anaplan. Whether you are uploading a tiny configuration table or a 2-Gigabyte daily transaction ledger, there is a method optimized for your pipeline.
+`anaplan-orm` provides four distinct methods for streaming data into Anaplan. Whether you are uploading a tiny configuration table or a 10-Gigabyte daily transaction ledger, there is a method optimized for your pipeline.
 
 ### 1. The Fast Path (`upload_file`)
 **Best for:** Small datasets, dimension updates, or configuration files (**< 10 MB**).
@@ -166,7 +167,7 @@ client.upload_file(
 ```
 
 ### 2. The Heavy Lifter (upload_file_chunked)
-Best for: Medium-to-Large datasets (10 MB - 100 MB) or pipelines running in strictly synchronous, memory-constrained environments (like basic AWS Lambda functions).
+Best for: Medium-to-Large datasets (10 MB - 100 MB) or pipelines running in strictly synchronous environments.
 How it works: Synchronously splits your CSV string into pieces (chunks) and uploads them one by one. This bypasses Anaplan's single-request timeout limits and guarantees safe delivery over unstable networks by retrying failed chunks individually.
 
 ```python
@@ -181,8 +182,8 @@ client.upload_file_chunked(
 ```
 
 ### 3. The Turbocharger (upload_file_chunked_async) 🚀
-Best for: Massive Enterprise Datasets (100 MB to Multi-Gigabyte) and time-critical pipelines.
-How it works: Utilizes Python's asyncio to blast multiple file chunks to the Anaplan server simultaneously. It includes a built-in Semaphore (default: 5 concurrent connections) to completely saturate your network bandwidth without triggering Anaplan's 429 Too Many Requests rate limits or crashing their backend database.
+Best for: Large Datasets already stored in memory (100 MB - 500 MB).
+How it works: Utilizes Python's asyncio to blast multiple file chunks to the Anaplan server simultaneously from a loaded Python string. It includes a built-in Semaphore (default: 5 concurrent connections) to completely saturate your network bandwidth without triggering Anaplan's 429 Too Many Requests rate limits.
 
 *Note: For files larger than 500MB, we recommend increasing the `chunk_size_mb` to 25 or 50 to reduce HTTP overhead. As per the [Official Anaplan API Documentation](https://help.anaplan.com/upload-a-text-or-csv-file-db641832-285c-41f7-a2e3-459859cb065e), the permitted data chunk size is strictly "between 1 to 50 MB".*
 
@@ -190,7 +191,7 @@ How it works: Utilizes Python's asyncio to blast multiple file chunks to the Ana
 import asyncio
 from anaplan_orm.client import AnaplanClient
 
-async def massive_upload_pipeline():
+async def fast_upload_pipeline():
     # Initialize your client
     client = AnaplanClient(authenticator=auth)
     
@@ -207,7 +208,33 @@ async def massive_upload_pipeline():
     )
 
 # Execute the async event loop
-asyncio.run(massive_upload_pipeline())
+asyncio.run(fast_upload_pipeline())
+```
+
+### 4. The Infinite Streamer (upload_file_streaming_async) 🌌
+Best for: Massive Enterprise Datasets (500 MB to 10+ Gigabytes) or memory-constrained environments (like small AWS Lambda functions or Docker containers).
+How it works: Instead of requiring the data to be in memory, this method takes a file_path. It uses aiofiles and a bounded Producer-Consumer queue to read the file directly from your hard drive in small chunks, piping them concurrently to Anaplan. Memory usage stays completely flat (typically under 150MB) regardless of file size, entirely eliminating Out Of Memory (OOM) crashes.
+
+```python
+import asyncio
+from anaplan_orm.client import AnaplanClient
+
+async def infinite_streaming_pipeline():
+    client = AnaplanClient(authenticator=auth)
+    
+    # Pass a local file path instead of a string
+    await client.upload_file_streaming_async(
+        workspace_id="YOUR_WORKSPACE_ID", 
+        model_id="YOUR_MODEL_ID", 
+        file_id="YOUR_FILE_ID", 
+        file_path="path/to/massive_export.csv", 
+        # Slice the file into 25MB pieces
+        chunk_size_mb=25,
+        # Upload 5 pieces at the exact same time          
+        max_concurrent_uploads=5      
+    )
+
+asyncio.run(infinite_streaming_pipeline())
 ```
 
 ---
