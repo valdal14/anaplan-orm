@@ -7,7 +7,7 @@
 A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).
 
 ## Current Status
-🚀 **Active Beta (v0.2.0)** 🚀
+🚀 **Active Beta (v0.4.0)** 🚀
 Core data transformation, parsing engine, chunked Anaplan API client, and custom strict-type validators are complete.
 
 ## 🌟 Features
@@ -68,7 +68,7 @@ status = client.ping()
 ```
 ---
 
-## Quick Start: XML Parsing & Data Upload
+## 📊 Quick Start: XML Parsing & Data Upload
 The `anaplan-orm` is designed to take raw XML strings (e.g., from MuleSoft or data pipeline payloads), validate them into Python objects, and stream them directly into Anaplan.
 
 ### 1. Define Your Model
@@ -266,7 +266,7 @@ status = client.wait_for_process_completion(
 
 ---
 
-### Advanced: Deeply Nested XML Extraction
+## 🪆 Advanced: Deeply Nested XML Extraction
 If your XML payload is deeply nested or relies heavily on attributes (common with SOAP APIs), you can use Pydantic's json_schema_extra to define native XPath 1.0 mappings. The parser will automatically evaluate the XPath, extract both text nodes and attributes, and map them to your Anaplan aliases.
 
 ```python
@@ -335,7 +335,7 @@ Below you can see the XML example used for the above example
 
 ---
 
-## Quick Start: JSON Parsing (REST APIs & Files)
+## 📝 Quick Start: JSON Parsing (REST APIs & Files)
 For modern web integrations or local file processing, `anaplan-orm` provides a native `JSONParser`. It gracefully handles both flat JSON arrays and nested API responses by allowing you to pass targeted extraction keys directly through your Pydantic model.
 
 ### 1. Define Your Model
@@ -403,7 +403,7 @@ class NestedEmployee(AnaplanModel):
 
 ---
 
-## Quick Start: SQL Databases (Relational Data to Anaplan)
+## 🫙 Quick Start: SQL Databases (Relational Data to Anaplan)
 If your source data lives in a relational database (Snowflake, PostgreSQL, SQL Server), `anaplan-orm` provides an `SQLCursorParser`. This allows you to stream live database queries directly into Pydantic models without ever saving a CSV to disk.
 
 ### 1. Execute your query and pass the cursor
@@ -509,7 +509,7 @@ asyncio.run(massive_download_pipeline())
 
 ---
 
-## 🧠 In-Flight Processing
+## 🧠 In-Flight Processing ORM
 Regardless of how you download the data, if you need to validate data types, perform cross-column mathematical transformations, or mask sensitive PII before routing the data to another microservice, you can seamlessly inflate the CSV into strongly-typed Pydantic models.
 
 If you need to validate data types, perform cross-column mathematical transformations, or mask sensitive PII before routing the data to another microservice, you can seamlessly inflate the CSV into strongly-typed Pydantic models.
