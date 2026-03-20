@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from typing import AsyncGenerator
 
 import aiofiles
 import httpx
@@ -733,6 +734,86 @@ class AnaplanClient:
         response.raise_for_status()
 
         return response.content
+
+    async def download_file_streaming_async(
+        self, workspace_id: str, model_id: str, file_id: str
+    ) -> AsyncGenerator[str, None]:
+        """
+        Downloads a massive file from Anaplan as an Asynchronous Generator.
+
+        Yields the file line-by-line (or complete row by complete row) by safely
+        buffering chunk boundaries. This guarantees a flat memory footprint
+        regardless of the export's total size.
+
+        Args:
+            workspace_id (str): The Anaplan workspace ID.
+            model_id (str): The Anaplan destination model ID.
+            file_id (str): The Anaplan destination file ID (usually the export ID).
+
+        Yields:
+            str: A single, fully decoded complete row from the Anaplan CSV export.
+
+        Raises:
+            AnaplanConnectionError: If a network connection fails or Anaplan rejects the request.
+        """
+
+        async with httpx.AsyncClient(
+            base_url=self.BASE_URL, timeout=self.timeout, verify=self.verify_ssl
+        ) as async_client:
+            # Isolated Async Helpers for Retries
+            @async_retry_network_errors()
+            async def _get_chunk_count() -> int:
+                count_url = f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks"
+                headers = self.authenticator.get_auth_headers()
+                response = await async_client.get(count_url, headers=headers)
+                response.raise_for_status()
+                return len(response.json().get("chunks", []))
+
+            @async_retry_network_errors()
+            async def _download_single_chunk(chunk_index: str) -> bytes:
+                chunk_url = self._file_chunk_url_builder(
+                    workspace_id, model_id, file_id, chunk_index
+                )
+                headers = self.authenticator.get_auth_headers()
+                headers["Accept"] = "application/octet-stream"
+                response = await async_client.get(chunk_url, headers=headers)
+                response.raise_for_status()
+                return response.content
+
+            try:
+                # Fetch total chunks
+                chunk_count = await _get_chunk_count()
+                if chunk_count == 0:
+                    return
+
+                logger.info(f"Initiating Streaming Download: {chunk_count} total chunks detected.")
+
+                buffer = b""
+
+                # Stream and Yield
+                for i in range(chunk_count):
+                    chunk_id = str(i)
+                    logger.info(f"Downloading Chunk {chunk_id} of {chunk_count - 1}...")
+
+                    chunk_data = await _download_single_chunk(chunk_id)
+                    buffer += chunk_data
+
+                    # Split the buffer by Newline
+                    while b"\n" in buffer:
+                        line, buffer = buffer.split(b"\n", 1)
+                        # Yield the complete line (decoded to string), adding the newline back
+                        yield line.decode("utf-8") + "\n"
+
+                # Yield any remaining data in the buffer (the final row might not have a trailing newline)
+                if buffer:
+                    yield buffer.decode("utf-8")
+
+                logger.info("Streaming Download Completed Successfully.")
+
+            except httpx.HTTPError as e:
+                raise AnaplanConnectionError(
+                    f"Failed during async streaming download process: {str(e)}"
+                ) from e
 
     # NOTE: Helper Methods ####################################################################################################
     def _process_to_sleep(self, t: int) -> None:

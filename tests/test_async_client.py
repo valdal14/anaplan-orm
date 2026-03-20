@@ -172,3 +172,102 @@ async def test_upload_file_streaming_async_failure_retries(client, tmp_path):
 
     # Verify the worker attempted to retry the chunk before failing
     assert chunk_route.call_count >= 3
+
+
+# NOTE: Streaming Download Tests ###################################################################################
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_download_file_streaming_async_success(client):
+    """Test that the streaming download yields complete lines and buffers broken chunks perfectly."""
+    workspace_id = "ws_down"
+    model_id = "mod_down"
+    file_id = "file_down"
+
+    # Mock the Chunk Count Endpoint (Tell the client there are 3 chunks)
+    count_url = (
+        f"{client.BASE_URL}/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks"
+    )
+    respx.get(count_url).respond(
+        status_code=200, json={"chunks": [{"id": "0"}, {"id": "1"}, {"id": "2"}]}
+    )
+
+    # Mock the 3 specific chunks with deliberately broken lines
+    chunk_0_url = (
+        f"{client.BASE_URL}/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks/0"
+    )
+    # Chunk 0 breaks right in the middle of "London"
+    respx.get(chunk_0_url).respond(
+        status_code=200, content=b"DEV_ID|DEV_NAME|DEV_LOCATION\n1001|Ada Lovelace|Lon"
+    )
+
+    chunk_1_url = (
+        f"{client.BASE_URL}/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks/1"
+    )
+    # Chunk 1 finishes "London" and breaks in the middle of the next row
+    respx.get(chunk_1_url).respond(status_code=200, content=b"don\n1002|Grace Hopper|New Y")
+
+    chunk_2_url = (
+        f"{client.BASE_URL}/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks/2"
+    )
+    # Chunk 2 finishes the file with no trailing newline
+    respx.get(chunk_2_url).respond(status_code=200, content=b"ork")
+
+    # Execute the Generator
+    yielded_lines = []
+    async for line in client.download_file_streaming_async(workspace_id, model_id, file_id):
+        yielded_lines.append(line)
+
+    # Verify the buffer perfectly stitched the rows together!
+    assert len(yielded_lines) == 3
+    assert yielded_lines[0] == "DEV_ID|DEV_NAME|DEV_LOCATION\n"
+    assert yielded_lines[1] == "1001|Ada Lovelace|London\n"
+    assert yielded_lines[2] == "1002|Grace Hopper|New York"  # No trailing newline on the last row
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_download_file_streaming_async_empty(client):
+    """Test that the generator safely exits if Anaplan returns 0 chunks."""
+    workspace_id = "ws_empty"
+    model_id = "mod_empty"
+    file_id = "file_empty"
+
+    count_url = (
+        f"{client.BASE_URL}/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks"
+    )
+    respx.get(count_url).respond(status_code=200, json={"chunks": []})
+
+    yielded_lines = []
+    async for line in client.download_file_streaming_async(workspace_id, model_id, file_id):
+        yielded_lines.append(line)
+
+    assert len(yielded_lines) == 0
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_download_file_streaming_async_failure(client):
+    """Test that the streaming download retries and eventually fails gracefully on network errors."""
+    workspace_id = "ws_fail"
+    model_id = "mod_fail"
+    file_id = "file_fail"
+
+    count_url = (
+        f"{client.BASE_URL}/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks"
+    )
+    respx.get(count_url).respond(status_code=200, json={"chunks": [{"id": "0"}]})
+
+    chunk_0_url = (
+        f"{client.BASE_URL}/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks/0"
+    )
+    chunk_route = respx.get(chunk_0_url).respond(status_code=500)
+
+    # Generator should raise AnaplanConnectionError after exhausting retries
+    with pytest.raises(AnaplanConnectionError):
+        async for _ in client.download_file_streaming_async(workspace_id, model_id, file_id):
+            pass
+
+    # Verify the retry decorator kicked in
+    assert chunk_route.call_count >= 3

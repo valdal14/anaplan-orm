@@ -16,7 +16,8 @@ Core data transformation, parsing engine, chunked Anaplan API client, and custom
 * **Enterprise Security:** Supports standard Basic Authentication and Anaplan's proprietary RSA-SHA512 Certificate-based Authentication (mTLS).
 * **Resilient Networking:** Built-in exponential backoff, automated retries to protect against dropped packets, and mid-flight authentication token refreshing for massive, long-running pipelines.
 * **Massive Payloads:** Automatically handles chunked file uploads for multi-megabyte/gigabyte datasets without memory crashes.
-* **Infinite Disk Streaming:** Utilizes `aiofiles` and an asynchronous bounded Producer-Consumer queue to stream multi-gigabyte files directly from disk to Anaplan with a flat, near-zero memory footprint.
+* **Infinite Disk Streaming (Uploads):** Utilizes `aiofiles` and an asynchronous bounded Producer-Consumer queue to stream multi-gigabyte files directly from disk to Anaplan with a flat, near-zero memory footprint.
+* **Async Generators (Downloads):** Safely extracts and buffers multi-gigabyte files out of Anaplan row-by-row, eliminating Out of Memory (OOM) crashes during massive data extractions.
 * **Smart Polling:** Asynchronous process execution with configurable, patient polling for long-running database transactions.
 
 ---
@@ -152,7 +153,7 @@ if __name__ == "__main__":
 
 `anaplan-orm` provides four distinct methods for streaming data into Anaplan. Whether you are uploading a tiny configuration table or a 10-Gigabyte daily transaction ledger, there is a method optimized for your pipeline.
 
-### 1. The Fast Path (`upload_file`)
+### 1. The Fast Path (upload_file)
 **Best for:** Small datasets, dimension updates, or configuration files (**< 10 MB**).
 **How it works:** Executes a single, synchronous `PUT` request. It has zero overhead and is the absolute fastest way to get small amounts of data into Anaplan.
 
@@ -167,8 +168,8 @@ client.upload_file(
 ```
 
 ### 2. The Heavy Lifter (upload_file_chunked)
-Best for: Medium-to-Large datasets (10 MB - 100 MB) or pipelines running in strictly synchronous environments.
-How it works: Synchronously splits your CSV string into pieces (chunks) and uploads them one by one. This bypasses Anaplan's single-request timeout limits and guarantees safe delivery over unstable networks by retrying failed chunks individually.
+**Best for:** Medium-to-Large datasets (10 MB - 100 MB) or pipelines running in strictly synchronous environments.
+**How it works:** Synchronously splits your CSV string into pieces (chunks) and uploads them one by one. This bypasses Anaplan's single-request timeout limits and guarantees safe delivery over unstable networks by retrying failed chunks individually.
 
 ```python
 # Uploads sequentially, one 10MB chunk at a time
@@ -182,8 +183,8 @@ client.upload_file_chunked(
 ```
 
 ### 3. The Turbocharger (upload_file_chunked_async) 🚀
-Best for: Large Datasets already stored in memory (100 MB - 500 MB).
-How it works: Utilizes Python's asyncio to blast multiple file chunks to the Anaplan server simultaneously from a loaded Python string. It includes a built-in Semaphore (default: 5 concurrent connections) to completely saturate your network bandwidth without triggering Anaplan's 429 Too Many Requests rate limits.
+**Best for:** Large Datasets already stored in memory (100 MB - 500 MB).
+**How it works:** Utilizes Python's asyncio to blast multiple file chunks to the Anaplan server simultaneously from a loaded Python string. It includes a built-in Semaphore (default: 5 concurrent connections) to completely saturate your network bandwidth without triggering Anaplan's 429 Too Many Requests rate limits.
 
 *Note: For files larger than 500MB, we recommend increasing the `chunk_size_mb` to 25 or 50 to reduce HTTP overhead. As per the [Official Anaplan API Documentation](https://help.anaplan.com/upload-a-text-or-csv-file-db641832-285c-41f7-a2e3-459859cb065e), the permitted data chunk size is strictly "between 1 to 50 MB".*
 
@@ -212,8 +213,8 @@ asyncio.run(fast_upload_pipeline())
 ```
 
 ### 4. The Infinite Streamer (upload_file_streaming_async) 🌌
-Best for: Massive Enterprise Datasets (500 MB to 10+ Gigabytes) or memory-constrained environments (like small AWS Lambda functions or Docker containers).
-How it works: Instead of requiring the data to be in memory, this method takes a file_path. It uses aiofiles and a bounded Producer-Consumer queue to read the file directly from your hard drive in small chunks, piping them concurrently to Anaplan. Memory usage stays completely flat (typically under 150MB) regardless of file size, entirely eliminating Out Of Memory (OOM) crashes.
+**Best for:** Massive Enterprise Datasets (500 MB to 10+ Gigabytes) or memory-constrained environments (like small AWS Lambda functions or Docker containers).
+**How it works:** Instead of requiring the data to be in memory, this method takes a file_path. It uses aiofiles and a bounded Producer-Consumer queue to read the file directly from your hard drive in small chunks, piping them concurrently to Anaplan. Memory usage stays completely flat (typically under 150MB) regardless of file size, entirely eliminating Out Of Memory (OOM) crashes.
 
 ```python
 import asyncio
@@ -462,27 +463,54 @@ print(row_2.model_dump())
 
 ---
 
-## ⬇️ Extracting Data (Outbound Pipeline)
+## ⬇️ Download Strategies (Extracting Data)
 
-`anaplan-orm` supports two distinct architectural patterns for extracting data, depending on your pipeline's requirements.
+`anaplan-orm` provides two distinct architectural patterns for extracting data out of Anaplan, plus a powerful parsing engine to transform that data on the fly.
 
-### Option A: Pure Extract & Load (ELT)
-If your goal is simply to move data from Anaplan to a Data Lake (like AWS S3) to ingest later. You can stream the raw CSV text directly.
+### 1. The In-Memory Pull (`download_file_chunked`)
+**Best for:** Small to Medium datasets (**< 50 MB**) or Dimension tables.
+**How it works:** Downloads all chunks and concatenates them into a single Python string in your server's RAM. 
 
 ```python
-# 1. Trigger the export and wait for completion
+# 1. Trigger export and wait
 task_id = client.execute_export(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
 client.wait_for_export_completion(WORKSPACE_ID, MODEL_ID, EXPORT_ID, task_id)
 
-# 2. Download the raw CSV string in chunks
+# 2. Download the entire file into memory as a string
 raw_csv_string = client.download_file_chunked(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
 
-# 3. Write directly to a file (or upload to AWS S3 using boto3)
+# 3. Write directly to a file (or upload to AWS S3 using boto3 for instance)
 with open("anaplan_export.csv", "w", encoding="utf-8") as f:
     f.write(raw_csv_string)
 ```
 
-### Option B: In-Flight Processing (The True ORM)
+### 2. The Infinite Streamer (download_file_streaming_async) 🌌
+**Best for:** Massive Enterprise Datasets (100 MB to 10+ Gigabytes) or strictly memory-constrained environments (like AWS Lambda or Docker containers).
+**How it works:** Acts as an Asynchronous Generator. It safely buffers Anaplan's network chunks and yields the data row-by-row. Your server never holds more than a single chunk in memory at any given time, completely eliminating Out of Memory (OOM) crashes.
+**Enterprise Use Cases:** Writing massive historical ledgers to a local hard drive, or streaming data directly into an AWS S3 multipart_upload without saving the file locally.
+
+```python
+import asyncio
+import aiofiles
+from anaplan_orm.client import AnaplanClient
+
+async def massive_download_pipeline():
+    client = AnaplanClient(authenticator=auth)
+    task_id = client.execute_export(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
+    client.wait_for_export_completion(WORKSPACE_ID, MODEL_ID, EXPORT_ID, task_id)
+    
+    # Stream from Anaplan directly to the local disk, row by row!
+    async with aiofiles.open("massive_export.csv", mode="w", encoding="utf-8") as f:
+        async for line in client.download_file_streaming_async(WORKSPACE_ID, MODEL_ID, EXPORT_ID):
+            await f.write(line)
+
+asyncio.run(massive_download_pipeline())
+```
+
+---
+
+## 🧠 In-Flight Processing
+Regardless of how you download the data, if you need to validate data types, perform cross-column mathematical transformations, or mask sensitive PII before routing the data to another microservice, you can seamlessly inflate the CSV into strongly-typed Pydantic models.
 
 If you need to validate data types, perform cross-column mathematical transformations, or mask sensitive PII before routing the data to another microservice, you can seamlessly inflate the CSV into strongly-typed Pydantic models.
 
@@ -490,15 +518,15 @@ If you need to validate data types, perform cross-column mathematical transforma
 from pydantic import BaseModel, Field, ValidationError
 from anaplan_orm.parsers import CSVStringParser
 
-# Define your data contract
+# 1. Define your strict data contract
 class FinancialRow(BaseModel):
     cost_center: str = Field(alias="Cost Center")
     outlook_eur: float = Field(alias="Outlook in Local Currency")
 
-# 1. Parse the raw CSV string into a list of dictionaries
+# 2. Parse the raw CSV string (from `download_file_chunked`) into a list of dictionaries
 parsed_rows = CSVStringParser.parse(raw_csv_string)
 
-# 2. Inflate and validate the Pydantic models
+# 3. Inflate and validate the Pydantic models
 valid_models = []
 for row in parsed_rows:
     try:
@@ -506,7 +534,7 @@ for row in parsed_rows:
     except ValidationError as e:
         print(f"Quarantined invalid row: {e}")
 
-# You now have a list of mathematically safe Python objects for an easy transformations 
+# 4. Perform mathematically safe transformations 
 for model in valid_models:
     model.outlook_eur = model.outlook_eur * 1.05
 ```
