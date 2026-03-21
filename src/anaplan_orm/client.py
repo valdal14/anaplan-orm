@@ -8,15 +8,14 @@ import httpx
 
 from anaplan_orm.authenticator import Authenticator
 from anaplan_orm.exceptions import AnaplanConnectionError
+from anaplan_orm.routes import AnaplanRouter
 from anaplan_orm.utils import async_retry_network_errors, retry_network_errors
 
 logger = logging.getLogger(__name__)
 
 
 class AnaplanClient:
-    """
-    The core client for interacting with the Anaplan REST API.
-    """
+    """The core client for interacting with the Anaplan REST API."""
 
     # Anaplan's base API URL
     BASE_URL = "https://api.anaplan.com/2/0"
@@ -24,7 +23,11 @@ class AnaplanClient:
     MB_TO_BYTES = 1024 * 1024
 
     def __init__(
-        self, authenticator: Authenticator, verify_ssl: bool = True, timeout: float = 30.0
+        self,
+        authenticator: Authenticator,
+        verify_ssl: bool = True,
+        timeout: float = 30.0,
+        router: AnaplanRouter | None = None,
     ):
         """
         Initializes the Anaplan client with a specific authentication strategy.
@@ -32,14 +35,14 @@ class AnaplanClient:
         Args:
             authenticator (Authenticator): An instance of a class that implements
                 the Authenticator interface.
-
             verify_ssl: Default to True, used to bypass your corporate proxy if needed
-
             timeout: change default 5.0 httpx default timeout
+            router: An instance of a url string builder by default AnaplanRouter
         """
         self.authenticator = authenticator
-        self.timeout = timeout
         self.verify_ssl = verify_ssl
+        self.timeout = timeout
+        self.router = router or AnaplanRouter()
         self.http_client = httpx.Client(base_url=self.BASE_URL, verify=verify_ssl, timeout=timeout)
 
     @retry_network_errors()
@@ -60,6 +63,7 @@ class AnaplanClient:
             ) from e
 
     # NOTE: Methods used to upload of CSVs into Anaplan ################################################################################
+
     @retry_network_errors()
     def upload_file(self, workspace_id: str, model_id: str, file_id: str, csv_data: str) -> None:
         """
@@ -77,7 +81,7 @@ class AnaplanClient:
         headers = self.authenticator.get_auth_headers()
         headers["Content-Type"] = "application/octet-stream"
 
-        url_path = self._upload_file_url_builder(workspace_id, model_id, file_id)
+        url_path = self.router.upload_file_url_builder(workspace_id, model_id, file_id)
 
         try:
             # We must pass the csv_data encoded as bytes to the 'content' parameter
@@ -108,7 +112,7 @@ class AnaplanClient:
         headers = self.authenticator.get_auth_headers()
         headers["Content-Type"] = "application/json"
 
-        url_path = self._process_url_builder(workspace_id, model_id, process_id)
+        url_path = self.router.process_url_builder(workspace_id, model_id, process_id)
 
         try:
             response = self.http_client.post(
@@ -120,39 +124,6 @@ class AnaplanClient:
 
         except httpx.HTTPError as e:
             raise AnaplanConnectionError(f"Failed to execute process in Anaplan: {str(e)}") from e
-
-    @retry_network_errors()
-    def _get_process_task_status(
-        self, workspace_id: str, model_id: str, process_id: str, task_id: str
-    ) -> dict:
-        """
-        Fetches the current status of an asynchronous Anaplan process task.
-
-        Args:
-            workspace_id: Anaplan's workspace id as string
-            model_id: Anaplan's destination model id as string
-            process_id: Anaplan's destination process id as string
-            task_id: Anaplan's task id used to check request status
-
-        Returns:
-            dict: Contains the information about the status of the process.
-
-        Raises:
-            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
-        """
-        headers = self.authenticator.get_auth_headers()
-        url_path = self._process_task_url_builder(workspace_id, model_id, process_id, task_id)
-
-        try:
-            response = self.http_client.get(url_path, headers=headers)
-            response.raise_for_status()
-
-            return response.json()["task"]
-
-        except httpx.HTTPError as e:
-            raise AnaplanConnectionError(
-                f"Failed to fetch task status from Anaplan: {str(e)}"
-            ) from e
 
     def wait_for_process_completion(
         self,
@@ -229,17 +200,17 @@ class AnaplanClient:
         Raises:
             AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
         """
-        # --- Initialise the partial upload stream ---
+        # Initialise the partial upload stream
         headers = self.authenticator.get_auth_headers()
         headers["Content-Type"] = "application/json"
 
-        init_url_path = self._upload_file_url_builder(workspace_id, model_id, file_id)
+        init_url_path = self.router.upload_file_url_builder(workspace_id, model_id, file_id)
 
         try:
-            # --- Send the initial request for chunks upload
+            # Send the initial request for chunks upload
             self._initialize_chunked_upload(init_url_path, headers)
 
-            # --- Slice and Stream the bytes to Anaplan ---
+            # Slice and Stream the bytes to Anaplan
             byte_data = csv_data.encode("utf-8")
             chunk_size_bytes = chunk_size_mb * self.MB_TO_BYTES
             total_bytes = len(byte_data)
@@ -250,7 +221,9 @@ class AnaplanClient:
 
                 logger.info(f"Uploading Chunk {chunk_id} for file {file_id}...")
 
-                chunk_url = self._file_chunk_url_builder(workspace_id, model_id, file_id, chunk_id)
+                chunk_url = self.router.file_chunk_url_builder(
+                    workspace_id, model_id, file_id, chunk_id
+                )
                 chunk_headers = self.authenticator.get_auth_headers()
                 chunk_headers["Content-Type"] = "application/octet-stream"
                 # upload a single chunk
@@ -258,8 +231,8 @@ class AnaplanClient:
 
             logger.info("Uploading Chunks Process Completed. Finalizing...")
 
-            # --- Post the final request to inform the partial upload has completed ---
-            complete_url = self._file_complete_url_builder(workspace_id, model_id, file_id)
+            # Post the final request to inform the partial upload has completed
+            complete_url = self.router.file_complete_url_builder(workspace_id, model_id, file_id)
             complete_headers = self.authenticator.get_auth_headers()
             complete_headers["Content-Type"] = "application/json"
 
@@ -268,24 +241,6 @@ class AnaplanClient:
         except httpx.HTTPError as e:
             # Updated to a more generic error message
             raise AnaplanConnectionError(f"Failed during chunked upload process: {str(e)}") from e
-
-    @retry_network_errors()
-    def _initialize_chunked_upload(self, url: str, headers: dict) -> None:
-        """Isolated helper to send the first request for chunks upload, protected by retries."""
-        response = self.http_client.post(url, headers=headers, json={"chunkCount": -1})
-        response.raise_for_status()
-
-    @retry_network_errors()
-    def _send_chunk(self, url: str, headers: dict, content: bytes) -> None:
-        """Isolated helper to send a single chunk, protected by retries."""
-        response = self.http_client.put(url, headers=headers, content=content)
-        response.raise_for_status()
-
-    @retry_network_errors()
-    def _complete_chunked_upload(self, url: str, headers: dict, file_id: str) -> None:
-        """Isolated helper to send the final request for chunks upload, protected by retries."""
-        response = self.http_client.post(url, headers=headers, json={"id": file_id})
-        response.raise_for_status()
 
     async def upload_file_chunked_async(
         self,
@@ -343,7 +298,7 @@ class AnaplanClient:
             base_url=self.BASE_URL, timeout=self.timeout, verify=self.verify_ssl
         ) as async_client:
             try:
-                init_url = self._upload_file_url_builder(workspace_id, model_id, file_id)
+                init_url = self.router.upload_file_url_builder(workspace_id, model_id, file_id)
                 init_headers = self.authenticator.get_auth_headers()
                 init_headers["Content-Type"] = "application/json"
 
@@ -358,7 +313,7 @@ class AnaplanClient:
                     chunk = byte_data[i : i + chunk_size_bytes]
                     chunk_id = str(i // chunk_size_bytes)
 
-                    chunk_url = self._file_chunk_url_builder(
+                    chunk_url = self.router.file_chunk_url_builder(
                         workspace_id, model_id, file_id, chunk_id
                     )
                     chunk_headers = self.authenticator.get_auth_headers()
@@ -377,7 +332,9 @@ class AnaplanClient:
                 await asyncio.gather(*tasks)
 
                 logger.info("Async Uploading Chunks Completed. Finalizing...")
-                complete_url = self._file_complete_url_builder(workspace_id, model_id, file_id)
+                complete_url = self.router.file_complete_url_builder(
+                    workspace_id, model_id, file_id
+                )
                 complete_headers = self.authenticator.get_auth_headers()
                 complete_headers["Content-Type"] = "application/json"
 
@@ -418,8 +375,6 @@ class AnaplanClient:
         Raises:
             AnaplanConnectionError: If a network connection fails, the file cannot be read, or Anaplan rejects the upload.
         """
-        from anaplan_orm.utils import async_retry_network_errors
-
         chunk_size_bytes = chunk_size_mb * self.MB_TO_BYTES
 
         async with httpx.AsyncClient(
@@ -427,7 +382,7 @@ class AnaplanClient:
         ) as async_client:
             try:
                 # Initialize Upload
-                init_url = self._upload_file_url_builder(workspace_id, model_id, file_id)
+                init_url = self.router.upload_file_url_builder(workspace_id, model_id, file_id)
                 init_headers = self.authenticator.get_auth_headers()
                 init_headers["Content-Type"] = "application/json"
 
@@ -463,7 +418,7 @@ class AnaplanClient:
                             logger.info(
                                 f"Worker {worker_id}: Streaming Chunk {chunk_id} to Anaplan..."
                             )
-                            chunk_url = self._file_chunk_url_builder(
+                            chunk_url = self.router.file_chunk_url_builder(
                                 workspace_id, model_id, file_id, str(chunk_id)
                             )
                             chunk_headers = self.authenticator.get_auth_headers()
@@ -512,7 +467,9 @@ class AnaplanClient:
 
                 # Finalize Upload
                 logger.info("Streaming Upload Completed. Finalizing...")
-                complete_url = self._file_complete_url_builder(workspace_id, model_id, file_id)
+                complete_url = self.router.file_complete_url_builder(
+                    workspace_id, model_id, file_id
+                )
                 complete_headers = self.authenticator.get_auth_headers()
                 complete_headers["Content-Type"] = "application/json"
 
@@ -527,6 +484,7 @@ class AnaplanClient:
                 ) from e
 
     # NOTE: Method used to exports/downloads From Anaplan ##############################################################################
+
     @retry_network_errors()
     def execute_export(self, workspace_id: str, model_id: str, export_id: str) -> str:
         """
@@ -546,7 +504,7 @@ class AnaplanClient:
         headers = self.authenticator.get_auth_headers()
         headers["Content-Type"] = "application/json"
 
-        url_path = self._export_url_builder(workspace_id, model_id, export_id)
+        url_path = self.router.export_url_builder(workspace_id, model_id, export_id)
 
         try:
             response = self.http_client.post(
@@ -558,41 +516,6 @@ class AnaplanClient:
 
         except httpx.HTTPError as e:
             raise AnaplanConnectionError(f"Failed to execute export in Anaplan: {str(e)}") from e
-
-    @retry_network_errors()
-    def _get_export_task_status(
-        self, workspace_id: str, model_id: str, export_id: str, task_id: str
-    ) -> dict:
-        """
-        Checks the Anaplan status of the given export task.
-
-        Args:
-            workspace_id (str): The Anaplan workspace ID.
-            model_id (str): The Anaplan destination model ID.
-            export_id (str): Anaplan's destination export id as string.
-            task_id (str): Anaplan's task id used to check request status.
-
-        Returns:
-            dict: Contains the information about the status of the export process.
-
-        Raises:
-            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
-        """
-        headers = self.authenticator.get_auth_headers()
-        headers["Content-Type"] = "application/json"
-
-        url_path = self._export_task_url_builder(workspace_id, model_id, export_id, task_id)
-
-        try:
-            response = self.http_client.get(url_path, headers=headers)
-            response.raise_for_status()
-
-            return response.json()["task"]
-
-        except httpx.HTTPError as e:
-            raise AnaplanConnectionError(
-                f"Failed to fetch export status from Anaplan: {str(e)}"
-            ) from e
 
     def wait_for_export_completion(
         self,
@@ -669,11 +592,11 @@ class AnaplanClient:
             AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
         """
         try:
-            # 1. Get the chunk count directly from the /chunks endpoint
-            chunks_url = f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks"
+            # Get the chunk count directly from the /chunks endpoint
+            chunks_url = self.router.file_chunk_list_url_builder(workspace_id, model_id, file_id)
             chunk_count = self._get_download_chunk_count(chunks_url)
 
-            # 2. Assemble the bytes
+            # Assemble the bytes
             downloaded_bytes = bytearray()
 
             for i in range(chunk_count):
@@ -682,58 +605,20 @@ class AnaplanClient:
                     f"Downloading Chunk {chunk_id} of {chunk_count - 1} for file {file_id}..."
                 )
 
-                chunk_url = self._file_chunk_url_builder(workspace_id, model_id, file_id, chunk_id)
+                chunk_url = self.router.file_chunk_url_builder(
+                    workspace_id, model_id, file_id, chunk_id
+                )
 
                 chunk_data = self._download_chunk(chunk_url)
                 downloaded_bytes.extend(chunk_data)
 
             logger.info("Downloading Chunks Process Completed. Decoding...")
 
-            # 3. Decode to string
+            # Decode to string
             return downloaded_bytes.decode("utf-8")
 
         except httpx.HTTPError as e:
             raise AnaplanConnectionError(f"Failed during chunked download process: {str(e)}") from e
-
-    @retry_network_errors()
-    def _get_download_chunk_count(self, url_path: str) -> int:
-        """
-        Fetches the total number of chunks available for a specific Anaplan file download.
-
-        Args:
-            url_path (str): The URL destination path to execute the GET request.
-
-        Returns:
-            int: The total number of chunks.
-
-        Raises:
-            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
-        """
-        headers = self.authenticator.get_auth_headers()
-
-        try:
-            response = self.http_client.get(url_path, headers=headers)
-            response.raise_for_status()
-
-            # Anaplan returns a JSON payload with a 'chunks' array. We just count the items!
-            return len(response.json().get("chunks", []))
-
-        except httpx.HTTPError as e:
-            raise AnaplanConnectionError(
-                f"Failed to fetch chunk count from Anaplan: {str(e)}"
-            ) from e
-
-    @retry_network_errors()
-    def _download_chunk(self, url_path: str) -> bytes:
-        """Isolated helper to fetch a single file chunk, protected by retries."""
-        headers = self.authenticator.get_auth_headers()
-        # Must use 'Accept' to inform Anaplan we want raw bytes back
-        headers["Accept"] = "application/octet-stream"
-
-        response = self.http_client.get(url_path, headers=headers)
-        response.raise_for_status()
-
-        return response.content
 
     async def download_file_streaming_async(
         self, workspace_id: str, model_id: str, file_id: str
@@ -763,7 +648,7 @@ class AnaplanClient:
             # Isolated Async Helpers for Retries
             @async_retry_network_errors()
             async def _get_chunk_count() -> int:
-                count_url = f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks"
+                count_url = self.router.file_chunk_list_url_builder(workspace_id, model_id, file_id)
                 headers = self.authenticator.get_auth_headers()
                 response = await async_client.get(count_url, headers=headers)
                 response.raise_for_status()
@@ -771,7 +656,7 @@ class AnaplanClient:
 
             @async_retry_network_errors()
             async def _download_single_chunk(chunk_index: str) -> bytes:
-                chunk_url = self._file_chunk_url_builder(
+                chunk_url = self.router.file_chunk_url_builder(
                     workspace_id, model_id, file_id, chunk_index
                 )
                 headers = self.authenticator.get_auth_headers()
@@ -815,45 +700,19 @@ class AnaplanClient:
                     f"Failed during async streaming download process: {str(e)}"
                 ) from e
 
-    # NOTE: Helper Methods ####################################################################################################
+    # NOTE: HELPER METHODS ####################################################################################################
+
     def _process_to_sleep(self, t: int) -> None:
         """Helper method to manage polling intervals by pausing script execution."""
         for _ in range(t):
             time.sleep(1)
 
-    def _upload_file_url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
-        """
-        Constructs the specific endpoint path for an Anaplan file.
-
-        Args:
-            workspace_id: Anaplan's workspace id as string
-            model_id: Anaplan's destination model id as string
-            file_id: Anaplan's destination file id as string
-
-        Returns:
-            str: The constructed Anaplan URL path.
-        """
-        return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}"
-
-    def _process_url_builder(self, workspace_id: str, model_id: str, process_id: str) -> str:
-        """
-        Constructs the specific endpoint path for an Anaplan process action.
-
-        Args:
-            workspace_id: Anaplan's workspace id as string
-            model_id: Anaplan's destination model id as string
-            process_id: Anaplan's destination process id as string
-
-        Returns:
-            str: The constructed Anaplan URL path.
-        """
-        return f"/workspaces/{workspace_id}/models/{model_id}/processes/{process_id}/tasks"
-
-    def _process_task_url_builder(
+    @retry_network_errors()
+    def _get_process_task_status(
         self, workspace_id: str, model_id: str, process_id: str, task_id: str
-    ) -> str:
+    ) -> dict:
         """
-        Constructs the specific endpoint path for an Anaplan process task verification.
+        Fetches the current status of an asynchronous Anaplan process task.
 
         Args:
             workspace_id: Anaplan's workspace id as string
@@ -862,84 +721,114 @@ class AnaplanClient:
             task_id: Anaplan's task id used to check request status
 
         Returns:
-            str: The constructed Anaplan URL path.
+            dict: Contains the information about the status of the process.
+
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
         """
-        return (
-            f"/workspaces/{workspace_id}/models/{model_id}/processes/{process_id}/tasks/{task_id}"
-        )
+        headers = self.authenticator.get_auth_headers()
+        url_path = self.router.process_task_url_builder(workspace_id, model_id, process_id, task_id)
 
-    def _file_chunk_url_builder(
-        self, workspace_id: str, model_id: str, file_id: str, chunk_id: str
-    ) -> str:
-        """
-        Constructs the specific endpoint path for an Anaplan chunk upload API.
+        try:
+            response = self.http_client.get(url_path, headers=headers)
+            response.raise_for_status()
 
-        Args:
-            workspace_id: Anaplan's workspace id as string
-            model_id: Anaplan's destination model id as string
-            file_id: Anaplan's destination file id as string
-            chunk_id: Index of the chunk to be uploaded
+            return response.json()["task"]
 
-        Returns:
-            str: The constructed Anaplan URL path.
-        """
-        return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/chunks/{chunk_id}"
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(
+                f"Failed to fetch task status from Anaplan: {str(e)}"
+            ) from e
 
-    def _file_complete_url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
-        """
-        Constructs the specific endpoint path to complete a chunked file upload.
+    @retry_network_errors()
+    def _download_chunk(self, url_path: str) -> bytes:
+        """Isolated helper to fetch a single file chunk, protected by retries."""
+        headers = self.authenticator.get_auth_headers()
+        # Must use 'Accept' to inform Anaplan we want raw bytes back
+        headers["Accept"] = "application/octet-stream"
 
-        Args:
-            workspace_id: Anaplan's workspace id as string
-            model_id: Anaplan's destination model id as string
-            file_id: Anaplan's destination file id as string
+        response = self.http_client.get(url_path, headers=headers)
+        response.raise_for_status()
 
-        Returns:
-            str: The constructed Anaplan URL path.
-        """
-        return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}/complete"
+        return response.content
 
-    def _export_url_builder(self, workspace_id: str, model_id: str, export_id: str) -> str:
-        """
-        Constructs the specific endpoint path for an Anaplan export API.
-
-        Args:
-            workspace_id: Anaplan's workspace id as string
-            model_id: Anaplan's destination model id as string
-            export_id: Anaplan's destination export id as string
-
-        Returns:
-            str: The constructed Anaplan URL path.
-        """
-        return f"/workspaces/{workspace_id}/models/{model_id}/exports/{export_id}/tasks"
-
-    def _export_task_url_builder(
+    @retry_network_errors()
+    def _get_export_task_status(
         self, workspace_id: str, model_id: str, export_id: str, task_id: str
-    ) -> str:
+    ) -> dict:
         """
-        Constructs the specific endpoint path for an Anaplan task API.
+        Checks the Anaplan status of the given export task.
 
         Args:
-            workspace_id: Anaplan's workspace id as string
-            model_id: Anaplan's destination model id as string
-            export_id: Anaplan's destination export id as string
-            task_id: Anaplan's task id used to check request status
+            workspace_id (str): The Anaplan workspace ID.
+            model_id (str): The Anaplan destination model ID.
+            export_id (str): Anaplan's destination export id as string.
+            task_id (str): Anaplan's task id used to check request status.
 
         Returns:
-            str: The constructed Anaplan URL path.
-        """
-        return f"/workspaces/{workspace_id}/models/{model_id}/exports/{export_id}/tasks/{task_id}"
+            dict: Contains the information about the status of the export process.
 
-    def _file_info_url_builder(self, workspace_id: str, model_id: str, file_id: str) -> str:
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
         """
-        Constructs the specific endpoint path for an Anaplan file API.
+        headers = self.authenticator.get_auth_headers()
+        headers["Content-Type"] = "application/json"
+
+        url_path = self.router.export_task_url_builder(workspace_id, model_id, export_id, task_id)
+
+        try:
+            response = self.http_client.get(url_path, headers=headers)
+            response.raise_for_status()
+
+            return response.json()["task"]
+
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(
+                f"Failed to fetch export status from Anaplan: {str(e)}"
+            ) from e
+
+    @retry_network_errors()
+    def _initialize_chunked_upload(self, url: str, headers: dict) -> None:
+        """Isolated helper to send the first request for chunks upload, protected by retries."""
+        response = self.http_client.post(url, headers=headers, json={"chunkCount": -1})
+        response.raise_for_status()
+
+    @retry_network_errors()
+    def _send_chunk(self, url: str, headers: dict, content: bytes) -> None:
+        """Isolated helper to send a single chunk, protected by retries."""
+        response = self.http_client.put(url, headers=headers, content=content)
+        response.raise_for_status()
+
+    @retry_network_errors()
+    def _complete_chunked_upload(self, url: str, headers: dict, file_id: str) -> None:
+        """Isolated helper to send the final request for chunks upload, protected by retries."""
+        response = self.http_client.post(url, headers=headers, json={"id": file_id})
+        response.raise_for_status()
+
+    @retry_network_errors()
+    def _get_download_chunk_count(self, url_path: str) -> int:
+        """
+        Fetches the total number of chunks available for a specific Anaplan file download.
 
         Args:
-            workspace_id: Anaplan's workspace id as string
-            model_id: Anaplan's destination model id as string
-            file_id: Anaplan's destination file id as string
+            url_path (str): The URL destination path to execute the GET request.
 
         Returns:
-            str: The constructed Anaplan URL path.
+            int: The total number of chunks.
+
+        Raises:
+            AnaplanConnectionError: If a connection fails or Anaplan rejects the request.
         """
-        return f"/workspaces/{workspace_id}/models/{model_id}/files/{file_id}"
+        headers = self.authenticator.get_auth_headers()
+
+        try:
+            response = self.http_client.get(url_path, headers=headers)
+            response.raise_for_status()
+
+            # Anaplan returns a JSON payload with a 'chunks' array. We just count the items!
+            return len(response.json().get("chunks", []))
+
+        except httpx.HTTPError as e:
+            raise AnaplanConnectionError(
+                f"Failed to fetch chunk count from Anaplan: {str(e)}"
+            ) from e
