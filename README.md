@@ -22,6 +22,15 @@ Core data transformation, parsing engine, chunked Anaplan API client, and custom
 
 ---
 
+## 🛣️ Roadmap (Upcoming Releases)
+`anaplan-orm` is actively being developed toward a stable `v1.0.0` release. Here is what is coming next:
+
+* **v0.6.0 (Model-to-Model Imports):** Dedicated wrappers to seamlessly trigger internal data flows from Anaplan Data Hubs directly into Spoke Models.
+* **v0.7.0 (Action Executions & Purges):** Triggering Anaplan Delete Actions to dynamically truncate/clear staging modules prior to fresh data loads.
+* **v1.0.0 (Metadata Discovery & Docs):** Dynamic `GET` methods to fetch Workspaces, Models, and IDs directly via Python, plus an exhaustive `MkDocs` API reference site.
+
+---
+
 ## 🔐 Authentication
 
 `anaplan-orm` uses a decoupled authentication strategy, allowing you to easily swap between development and production security standards.
