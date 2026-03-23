@@ -27,8 +27,6 @@ incoming_data = """
 </AnaplanExport>
 """
 
-# NOTE: XMLStringParser tests ###################################################################
-
 
 def test_xml_string_parser():
     # Arrange: Create an instance of the XMLStringParser
