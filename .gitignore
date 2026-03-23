@@ -222,3 +222,8 @@ playground_data/
 *.json
 *.xml
 *.csv
+
+# Coverage reports
+.coverage
+htmlcov/
+coverage.xml

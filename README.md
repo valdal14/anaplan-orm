@@ -7,7 +7,7 @@
 A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).
 
 ## Current Status
-🚀 **Active Beta (v0.4.0)** 🚀
+🚀 **Active Beta (v0.5.0)** 🚀
 Core data transformation, parsing engine, chunked Anaplan API client, and custom strict-type validators are complete.
 
 ## 🌟 Features
@@ -19,55 +19,6 @@ Core data transformation, parsing engine, chunked Anaplan API client, and custom
 * **Infinite Disk Streaming (Uploads):** Utilizes `aiofiles` and an asynchronous bounded Producer-Consumer queue to stream multi-gigabyte files directly from disk to Anaplan with a flat, near-zero memory footprint.
 * **Async Generators (Downloads):** Safely extracts and buffers multi-gigabyte files out of Anaplan row-by-row, eliminating Out of Memory (OOM) crashes during massive data extractions.
 * **Smart Polling:** Asynchronous process execution with configurable, patient polling for long-running database transactions.
-
----
-
-## 🗺️ Architecture: Where does `anaplan-orm` sit?
-
-`anaplan-orm` is designed to be the strongly-typed "bridge" between your modern data orchestrators and the Anaplan API. It operates in both schedule-driven batch processes and event-driven serverless architectures.
-
-### Architecture A: The Scheduled Pipeline (Airflow / Prefect)
-In a traditional ELT pipeline, orchestrators trigger a Python worker to query a database. `anaplan-orm` strictly validates that SQL data in-memory and streams it to Anaplan.
-
-```mermaid
-graph TD
-    A[Apache Airflow] -->|1. Triggers DAG| B[Python Worker]
-    B -->|2. Query Data| C[(PostgreSQL / Snowflake)]
-    C -.->|3. SQLCursorParser| D{anaplan-orm: Pydantic Validation}
-    D -->|4. upload_file_streaming_async| E[(Anaplan Model)]
-    
-    style A fill:#017cee,stroke:#000,stroke-width:2px,color:#fff
-    style D fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
-    style E fill:#005bea,stroke:#000,stroke-width:2px,color:#fff
-```
-
-### Architecture B: The Serverless Event Stream (AWS Lambda)
-For real-time integrations, external systems drop JSON/XML payloads into a message queue. A serverless function picks up the payload, and anaplan-orm handles the validation and chunked upload without ever touching a hard drive.
-
-```mermaid
-graph TD
-    A[Salesforce / Webhook] -->|1. JSON Payload| B[AWS SQS / EventBridge]
-    B -->|2. Triggers| C[AWS Lambda]
-    C -.->|3. JSONParser| D{anaplan-orm: Data Hydration}
-    D -->|4. upload_file_chunked_async| E[(Anaplan)]
-
-    style A fill:#ff9900,stroke:#000,stroke-width:2px,color:#fff
-    style C fill:#ff4f00,stroke:#000,stroke-width:2px,color:#fff
-    style D fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
-```
-
-### Architecture C: The Massive Data Extract (Data Lake)
-When backing up Anaplan models or feeding downstream BI tools, anaplan-orm acts as a memory-safe conduit, streaming multi-gigabyte files row-by-row directly into cloud storage.
-
-```mermaid
-graph LR
-    A[(Anaplan)] -->|1. download_file_streaming_async| B{anaplan-orm: Async Generator}
-    B -->|2. async for row in stream:| C[(AWS S3 / Azure Blob)]
-    
-    style A fill:#005bea,stroke:#000,stroke-width:2px,color:#fff
-    style B fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
-    style C fill:#527fff,stroke:#000,stroke-width:2px,color:#fff
-```
 
 ---
 
@@ -561,8 +512,6 @@ asyncio.run(massive_download_pipeline())
 ## 🧠 In-Flight Processing ORM
 Regardless of how you download the data, if you need to validate data types, perform cross-column mathematical transformations, or mask sensitive PII before routing the data to another microservice, you can seamlessly inflate the CSV into strongly-typed Pydantic models.
 
-If you need to validate data types, perform cross-column mathematical transformations, or mask sensitive PII before routing the data to another microservice, you can seamlessly inflate the CSV into strongly-typed Pydantic models.
-
 ```python
 from pydantic import BaseModel, Field, ValidationError
 from anaplan_orm.parsers import CSVStringParser
@@ -587,6 +536,57 @@ for row in parsed_rows:
 for model in valid_models:
     model.outlook_eur = model.outlook_eur * 1.05
 ```
+
+---
+
+## 🗺️ Architecture: Where does `anaplan-orm` sit?
+
+`anaplan-orm` is designed to be the strongly-typed "bridge" between your modern data orchestrators and the Anaplan API. It operates in both schedule-driven batch processes and event-driven serverless architectures.
+
+### Architecture A: The Scheduled Pipeline (Airflow / Prefect)
+In a traditional ELT pipeline, orchestrators trigger a Python worker to query a database. `anaplan-orm` strictly validates that SQL data in-memory and streams it to Anaplan.
+
+```mermaid
+graph TD
+    A[Apache Airflow] -->|1. Triggers DAG| B[Python Worker]
+    B -->|2. Query Data| C[(PostgreSQL / Snowflake)]
+    C -.->|3. SQLCursorParser| D{anaplan-orm: Pydantic Validation}
+    D -->|4. upload_file_streaming_async| E[(Anaplan Model)]
+    
+    style A fill:#017cee,stroke:#000,stroke-width:2px,color:#fff
+    style D fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
+    style E fill:#005bea,stroke:#000,stroke-width:2px,color:#fff
+```
+
+### Architecture B: The Serverless Event Stream (AWS Lambda)
+For real-time integrations, external systems drop JSON/XML payloads into a message queue. A serverless function picks up the payload, and `anaplan-orm` handles the validation and chunked upload without ever touching a hard drive.
+
+```mermaid
+graph TD
+    A[Salesforce / Webhook] -->|1. JSON Payload| B[AWS SQS / EventBridge]
+    B -->|2. Triggers| C[AWS Lambda]
+    C -.->|3. JSONParser| D{anaplan-orm: Data Hydration}
+    D -->|4. upload_file_chunked_async| E[(Anaplan)]
+
+    style A fill:#ff9900,stroke:#000,stroke-width:2px,color:#fff
+    style C fill:#ff4f00,stroke:#000,stroke-width:2px,color:#fff
+    style D fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
+```
+
+### Architecture C: The Massive Data Extract (Data Lake)
+When backing up Anaplan models or feeding downstream BI tools, `anaplan-orm` acts as a memory-safe conduit, streaming multi-gigabyte files row-by-row directly into cloud storage.
+
+```mermaid
+graph LR
+    A[(Anaplan)] -->|1. download_file_streaming_async| B{anaplan-orm: Async Generator}
+    B -->|2. async for row in stream:| C[(AWS S3 / Azure Blob)]
+    
+    style A fill:#005bea,stroke:#000,stroke-width:2px,color:#fff
+    style B fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
+    style C fill:#527fff,stroke:#000,stroke-width:2px,color:#fff
+```
+
+---
 
 ## 🤝 Contributing to anaplan-orm
 
