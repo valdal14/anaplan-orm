@@ -1,0 +1,48 @@
+site_name: anaplan-orm
+site_description: An Object-Relational Mapper (ORM) for the Anaplan API
+site_author: Valerio
+repo_url: https://github.com/valdal14/anaplan-orm
+
+theme:
+  name: material
+  features:
+    # Puts the main menu at the top
+    - navigation.tabs 
+    - navigation.sections
+    # Integrates the table of contents into the left sidebar
+    - toc.integrate 
+    - search.suggest
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_source: true
+
+nav:
+  - Home: index.md
+  - API Reference:
+    - Authenticator: api/authenticator.md
+    - Client: api/client.md
+    - Exceptions: api/exceptions.md
+    - Models: api/models.md
+    - Parsers: api/parsers.md
+    - Types: api/types.md

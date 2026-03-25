@@ -77,3 +77,39 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+  # ---------------------------------------------------------
+  # JOB 3: DEPLOY DOCS (Runs ONLY on merges/pushes to main)
+  # ---------------------------------------------------------
+  deploy-docs:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for mkdocs to push to the gh-pages branch
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.1.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Generate fresh lockfile on CI
+        run: poetry lock
+
+      - name: Install Dependencies
+        # This installs everything, including the dev group (MkDocs)
+        run: poetry install --no-interaction
+
+      - name: Deploy to GitHub Pages
+        run: poetry run mkdocs gh-deploy --force
