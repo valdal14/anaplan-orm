@@ -8,10 +8,8 @@ A lightweight Python 3 library that abstracts the Anaplan API into an Object-Rel
 
 📖 **Official API Documentation:** [https://valdal14.github.io/anaplan-orm/](https://valdal14.github.io/anaplan-orm/)
 
----
-
-## 🚀 Current Status - **Release Candidate (v1.0.0-rc)**
-The core ingestion engine, async streaming clients, parsing utilities, and M2M orchestration are fully complete and production-certified. The codebase is currently locked as a Release Candidate while we finalize the official API documentation site.
+## 🚀 Current Status - **Stable (v1.0.0)**
+The core ingestion engine, async streaming clients, parsing utilities, and M2M orchestration are fully complete, production-certified, and thoroughly documented. `anaplan-orm` is officially ready for enterprise deployments.
 
 ---
 
@@ -27,9 +25,8 @@ The core ingestion engine, async streaming clients, parsing utilities, and M2M o
 
 ---
 
-## 🛣️ Roadmap to v1.0.0 (Stable Release)
-
-* **v1.0.0 (The Documentation Release):** We are currently implementing `MkDocs` (with the Material theme) to generate a comprehensive, searchable API reference site directly from the library's Python docstrings. Once deployed, `v1.0.0` will be officially published to PyPI.
+## 🛣️ Roadmap
+With the `v1.0.0` stable release and automated MkDocs API documentation deployed, `anaplan-orm` is currently focused on maintenance and advanced enterprise features.
 
 ### 🔮 Future Backlog (v1.x)
 * **Action Executions & Purges:** Dedicated wrappers for triggering Anaplan Delete Actions to dynamically truncate/clear staging modules prior to fresh data loads.

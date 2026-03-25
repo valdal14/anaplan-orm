@@ -6,6 +6,10 @@
 
 A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).
 
+📖 **Official API Documentation:** [https://valdal14.github.io/anaplan-orm/](https://valdal14.github.io/anaplan-orm/)
+
+---
+
 ## 🚀 Current Status - **Release Candidate (v1.0.0-rc)**
 The core ingestion engine, async streaming clients, parsing utilities, and M2M orchestration are fully complete and production-certified. The codebase is currently locked as a Release Candidate while we finalize the official API documentation site.
 
