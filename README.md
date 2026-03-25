@@ -6,28 +6,29 @@
 
 A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).
 
-## Current Status
-🚀 **Active Beta (v0.5.0)** 🚀
-Core data transformation, parsing engine, chunked Anaplan API client, and custom strict-type validators are complete.
+## 🚀 Current Status - **Release Candidate (v1.0.0-rc)**
+The core ingestion engine, async streaming clients, parsing utilities, and M2M orchestration are fully complete and production-certified. The codebase is currently locked as a Release Candidate while we finalize the official API documentation site.
+
+---
 
 ## 🌟 Features
 * **Pydantic Data Ingestion:** Validates and maps Python objects to Anaplan models effortlessly.
-* **Custom Anaplan Types:** Built-in `AnaplanDate` and `AnaplanBoolean` automatically sanitize and strictly format Python native types (like `datetime.date` or `True/False`) into the exact string formats required by Anaplan's API.
+* **Custom Anaplan Types:** Built-in `AnaplanDate` and `AnaplanBoolean` automatically sanitize and strictly format Python native types into the exact string formats required by Anaplan's API.
 * **Enterprise Security:** Supports standard Basic Authentication and Anaplan's proprietary RSA-SHA512 Certificate-based Authentication (mTLS).
-* **Resilient Networking:** Built-in exponential backoff, automated retries to protect against dropped packets, and mid-flight authentication token refreshing for massive, long-running pipelines.
-* **Massive Payloads:** Automatically handles chunked file uploads for multi-megabyte/gigabyte datasets without memory crashes.
-* **Infinite Disk Streaming (Uploads):** Utilizes `aiofiles` and an asynchronous bounded Producer-Consumer queue to stream multi-gigabyte files directly from disk to Anaplan with a flat, near-zero memory footprint.
-* **Async Generators (Downloads):** Safely extracts and buffers multi-gigabyte files out of Anaplan row-by-row, eliminating Out of Memory (OOM) crashes during massive data extractions.
+* **Resilient Networking:** Built-in exponential backoff, automated retries to protect against dropped packets, and mid-flight token refreshing.
+* **Massive Payloads:** Automatically handles chunked file uploads for multi-megabyte/gigabyte datasets.
+* **Infinite Disk Streaming:** Utilizes `aiofiles` to stream multi-gigabyte files directly to/from Anaplan with a flat, near-zero memory footprint.
+* **Hub-and-Spoke Orchestration (M2M):** Seamlessly trigger and monitor internal Anaplan data flows from Data Hubs directly into destination Spoke Models.
 * **Smart Polling:** Asynchronous process execution with configurable, patient polling for long-running database transactions.
 
 ---
 
-## 🛣️ Roadmap (Upcoming Releases)
-`anaplan-orm` is actively being developed toward a stable `v1.0.0` release. Here is what is coming next:
+## 🛣️ Roadmap to v1.0.0 (Stable Release)
 
-* **v0.6.0 (Model-to-Model Imports):** Dedicated wrappers to seamlessly trigger internal data flows from Anaplan Data Hubs directly into Spoke Models.
-* **v0.7.0 (Action Executions & Purges):** Triggering Anaplan Delete Actions to dynamically truncate/clear staging modules prior to fresh data loads.
-* **v1.0.0 (Metadata Discovery & Docs):** Dynamic `GET` methods to fetch Workspaces, Models, and IDs directly via Python, plus an exhaustive `MkDocs` API reference site.
+* **v1.0.0 (The Documentation Release):** We are currently implementing `MkDocs` (with the Material theme) to generate a comprehensive, searchable API reference site directly from the library's Python docstrings. Once deployed, `v1.0.0` will be officially published to PyPI.
+
+### 🔮 Future Backlog (v1.x)
+* **Action Executions & Purges:** Dedicated wrappers for triggering Anaplan Delete Actions to dynamically truncate/clear staging modules prior to fresh data loads.
 
 ---
 
@@ -472,6 +473,47 @@ print(row_2.model_dump())
 
 ---
 
+## 🕸️ Advanced: Model-to-Model (M2M) Hub & Spoke Pipelines
+
+In enterprise deployments, it is best practice to load raw CSV data into a centralized **Data Hub Model**, run validation checks, and then push that clean data out to localized **Spoke Models** (like FP&A or Supply Chain) using an Anaplan Model-to-Model (M2M) process.
+
+`anaplan-orm` natively supports orchestrating this complex 3-step architecture using the same robust execution engine.
+
+> **Crucial Rule for M2M:** While the data flows *from* the Hub, Anaplan requires you to trigger the M2M process using the **Destination Model's ID**.
+
+```python
+import asyncio
+from anaplan_orm.authenticator import CertificateAuthenticator
+from anaplan_orm.client import AnaplanClient
+
+async def enterprise_m2m_pipeline():
+    auth = CertificateAuthenticator(
+        cert_path="your_cert.pem", 
+        cert_password="your_anaplanCertPassword"
+    )
+    client = AnaplanClient(authenticator=auth)
+
+    # 1. Stream the massive CSV directly from disk to the Data Hub
+    await client.upload_file_streaming_async(
+        workspace_id=HUB_WS,
+        model_id=HUB_MODEL,
+        file_id=HUB_FILE,
+        file_path="massive_daily_report.csv"
+    )
+
+    # 2. Trigger the Data Hub to ingest the uploaded file
+    hub_task = client.execute_process(HUB_WS, HUB_MODEL, HUB_PROCESS)
+    client.wait_for_process_completion(HUB_WS, HUB_MODEL, HUB_PROCESS, hub_task)
+
+    # 3. Trigger the Destination Spoke Model to pull the data from the Hub
+    m2m_task = client.execute_process(DEST_WS, DEST_MODEL, M2M_PROCESS)
+    client.wait_for_process_completion(DEST_WS, DEST_MODEL, M2M_PROCESS, m2m_task)
+
+asyncio.run(enterprise_m2m_pipeline())
+```
+
+---
+
 ## ⬇️ Download Strategies (Extracting Data)
 
 `anaplan-orm` provides two distinct architectural patterns for extracting data out of Anaplan, plus a powerful parsing engine to transform that data on the fly.
@@ -643,10 +685,8 @@ poetry run python3 -m pytest
 
 ### 4. The Pull Request Workflow
 
-```bash
-1 - Create a feature branch (e.g., feature/ORM-123-new-parser).
-2 - Write your code and your tests.
-3 - Run Ruff (format and check) and Pytest.
-4 - Push your branch to GitHub and open a Pull Request against main.
-4 - Wait for the automated CI pipeline to verify your build before merging.
-```
+1. Create a feature branch (e.g., feature/ORM-123-new-parser).
+2. Write your code and your tests.
+3. Run Ruff (format and check) and Pytest.
+4. Push your branch to GitHub and open a Pull Request against main.
+5. Wait for the automated CI pipeline to verify your build before merging.

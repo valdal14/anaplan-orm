@@ -1,6 +1,6 @@
 [project]
 name = "anaplan-orm"
-version = "0.5.0"
+version = "1.0.0"
 description = "An Object-Relational Mapper (ORM) for the Anaplan API using Pydantic."
 authors = [
     {name = "Valerio DAlessio", email = "valdal14@gmail.com"}
