@@ -1,17 +1,11 @@
 # anaplan-orm
 
 ![CI Pipeline](https://github.com/valdal14/anaplan-orm/actions/workflows/ci.yml/badge.svg)
+[![Documentation](https://img.shields.io/badge/docs-MkDocs-blue.svg)](https://valdal14.github.io/anaplan-orm/)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat&logo=python)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).
-
-📖 **Official API Documentation:** [https://valdal14.github.io/anaplan-orm/](https://valdal14.github.io/anaplan-orm/)
-
----
-
-## 🚀 Current Status - **Release Candidate (v1.0.0-rc)**
-The core ingestion engine, async streaming clients, parsing utilities, and M2M orchestration are fully complete and production-certified. The codebase is currently locked as a Release Candidate while we finalize the official API documentation site.
 
 ---
 
@@ -24,15 +18,6 @@ The core ingestion engine, async streaming clients, parsing utilities, and M2M o
 * **Infinite Disk Streaming:** Utilizes `aiofiles` to stream multi-gigabyte files directly to/from Anaplan with a flat, near-zero memory footprint.
 * **Hub-and-Spoke Orchestration (M2M):** Seamlessly trigger and monitor internal Anaplan data flows from Data Hubs directly into destination Spoke Models.
 * **Smart Polling:** Asynchronous process execution with configurable, patient polling for long-running database transactions.
-
----
-
-## 🛣️ Roadmap to v1.0.0 (Stable Release)
-
-* **v1.0.0 (The Documentation Release):** We are currently implementing `MkDocs` (with the Material theme) to generate a comprehensive, searchable API reference site directly from the library's Python docstrings. Once deployed, `v1.0.0` will be officially published to PyPI.
-
-### 🔮 Future Backlog (v1.x)
-* **Action Executions & Purges:** Dedicated wrappers for triggering Anaplan Delete Actions to dynamically truncate/clear staging modules prior to fresh data loads.
 
 ---
 

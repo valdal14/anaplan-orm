@@ -131,6 +131,11 @@ class AnaplanClient:
         """
         Uploads a large CSV string to Anaplan in sequential chunks.
 
+        Note:
+            For multi-gigabyte payloads, the final `/complete` endpoint may block
+            and appear silent for 15-40+ minutes while the server stitches the chunks together.
+            A dedicated log will print immediately prior to this invisible stitching phase.
+
         Args:
             workspace_id (str): The Anaplan workspace ID.
             model_id (str): The Anaplan destination model ID.
@@ -170,13 +175,12 @@ class AnaplanClient:
                 # upload a single chunk
                 self._send_chunk(chunk_url, chunk_headers, chunk)
 
-            logger.info("Uploading Chunks Process Completed. Finalizing...")
-
             # Post the final request to inform the partial upload has completed
             complete_url = self.router.file_complete_url_builder(workspace_id, model_id, file_id)
             complete_headers = self.authenticator.get_auth_headers()
             complete_headers["Content-Type"] = "application/json"
 
+            self._log_stitching_warning()
             self._complete_chunked_upload(complete_url, complete_headers, file_id)
 
         except httpx.HTTPError as e:
@@ -197,6 +201,11 @@ class AnaplanClient:
 
         Utilizes an asyncio.Semaphore to throttle concurrent connections, preventing
         the Anaplan API from returning 429 Too Many Requests while maximizing throughput.
+
+        Note:
+            For multi-gigabyte payloads, the final `/complete` endpoint may block
+            and appear silent for 15-40+ minutes while the server stitches the chunks together.
+            A dedicated log will print immediately prior to this invisible stitching phase.
 
         Args:
             workspace_id (str): The Anaplan workspace ID.
@@ -272,13 +281,13 @@ class AnaplanClient:
                 )
                 await asyncio.gather(*tasks)
 
-                logger.info("Async Uploading Chunks Completed. Finalizing...")
                 complete_url = self.router.file_complete_url_builder(
                     workspace_id, model_id, file_id
                 )
                 complete_headers = self.authenticator.get_auth_headers()
                 complete_headers["Content-Type"] = "application/json"
 
+                self._log_stitching_warning()
                 complete_resp = await async_client.post(
                     complete_url, headers=complete_headers, json={"id": file_id}
                 )
@@ -304,6 +313,11 @@ class AnaplanClient:
         Utilizes an asyncio.Queue to create a Producer-Consumer pipeline. This guarantees
         a flat, extremely low memory footprint regardless of the total file size, making
         it safe for multi-gigabyte uploads on memory-constrained systems.
+
+        Note:
+            For multi-gigabyte payloads, the final `/complete` endpoint may block
+            and appear silent for 15-40+ minutes while the server stitches the chunks together.
+            A dedicated log will print immediately prior to this invisible stitching phase.
 
         Args:
             workspace_id (str): The Anaplan workspace ID.
@@ -407,13 +421,13 @@ class AnaplanClient:
                         raise task.exception()
 
                 # Finalize Upload
-                logger.info("Streaming Upload Completed. Finalizing...")
                 complete_url = self.router.file_complete_url_builder(
                     workspace_id, model_id, file_id
                 )
                 complete_headers = self.authenticator.get_auth_headers()
                 complete_headers["Content-Type"] = "application/json"
 
+                self._log_stitching_warning()
                 complete_resp = await async_client.post(
                     complete_url, headers=complete_headers, json={"id": file_id}
                 )
@@ -598,6 +612,8 @@ class AnaplanClient:
 
         This method acts as a public facade, utilizing the internal Router to safely
         build the process-specific URL before passing it to the unified polling engine.
+        It features a built-in automated heartbeat that logs the task status and
+        elapsed time continuously, preventing perceived system freezes during long-running tasks.
 
         Args:
             workspace_id (str): The Anaplan workspace ID.
@@ -614,7 +630,7 @@ class AnaplanClient:
             AnaplanConnectionError: If the process fails, is cancelled, or runs out of retries.
         """
         url_path = self.router.process_task_url_builder(workspace_id, model_id, process_id, task_id)
-        return self._wait_for_task(url_path, retry, poll_interval)
+        return self._wait_for_task(url_path, retry, poll_interval, task_id)
 
     def wait_for_export_completion(
         self,
@@ -630,6 +646,8 @@ class AnaplanClient:
 
         This method acts as a public facade, utilizing the internal Router to safely
         build the export-specific URL before passing it to the unified polling engine.
+        It features a built-in automated heartbeat that logs the task status and
+        elapsed time continuously, preventing perceived system freezes during long-running tasks.
 
         Args:
             workspace_id (str): The Anaplan workspace ID.
@@ -646,26 +664,27 @@ class AnaplanClient:
             AnaplanConnectionError: If the export fails, is cancelled, or runs out of retries.
         """
         url_path = self.router.export_task_url_builder(workspace_id, model_id, export_id, task_id)
-        return self._wait_for_task(url_path, retry, poll_interval)
+        return self._wait_for_task(url_path, retry, poll_interval, task_id)
 
     # --- The Unified Internal Polling Engine ---
 
     def _wait_for_task(
-        self,
-        url_path: str,
-        retry: int,
-        poll_interval: int,
+        self, url_path: str, retry: int, poll_interval: int, task_id: str, start_time: float = None
     ) -> dict:
         """
         Internal recursive engine that polls any Anaplan task URL until completion.
 
         This method uses recursion to pause and re-check the task status until it
         either completes successfully, fails internally, or exhausts the allowed retries.
+        It tracks the start time across the recursive stack to provide an accurate
+        heartbeat log.
 
         Args:
             url_path (str): The fully constructed Anaplan API endpoint for the specific task.
             retry (int): The current number of polling attempts remaining.
             poll_interval (int): The number of seconds to sleep between network requests.
+            task_id (str): The specific task ID generated by the initial export/process execution.
+            start_time (float, optional): Used internally to handle the automated polling heartbeat.
 
         Returns:
             dict: The complete task dictionary returned by Anaplan upon successful completion.
@@ -673,6 +692,9 @@ class AnaplanClient:
         Raises:
             AnaplanConnectionError: If the task fails internally, hits an unknown state, or times out.
         """
+        if start_time is None:
+            start_time = time.time()
+
         if retry <= 0:
             raise AnaplanConnectionError(
                 "Anaplan task did not complete within the assigned time limit."
@@ -692,8 +714,11 @@ class AnaplanClient:
                 )
 
         if task_state in ["IN_PROGRESS", "NOT_STARTED"]:
+            # Calculate elapsed time and fire the Heartbeat
+            elapsed = int(time.time() - start_time)
+            logger.info(f"Task {task_id} Status: {task_state} (Elapsed: {elapsed}s)")
             self._process_to_sleep(poll_interval)
-            return self._wait_for_task(url_path, retry - 1, poll_interval)
+            return self._wait_for_task(url_path, retry - 1, poll_interval, task_id, start_time)
 
         raise AnaplanConnectionError(f"Task execution halted. Final state: {task_state}")
 
@@ -774,3 +799,9 @@ class AnaplanClient:
             raise AnaplanConnectionError(
                 f"Failed to fetch chunk count from Anaplan: {str(e)}"
             ) from e
+
+    def _log_stitching_warning(self) -> None:
+        """Centralized log to warn users of Anaplan's server-side finalization delay."""
+        logger.info(
+            "Streaming chunks complete. Waiting for Anaplan server to stitch and finalize the file..."
+        )
