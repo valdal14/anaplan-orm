@@ -1,0 +1,1686 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="An Object-Relational Mapper (ORM) for the Anaplan API">
+      
+      
+        <meta name="author" content="Valerio">
+      
+      
+      
+      
+        <link rel="next" href="api/authenticator/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>anaplan-orm</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#anaplan-orm" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="anaplan-orm" class="md-header__button md-logo" aria-label="anaplan-orm" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            anaplan-orm
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/valdal14/anaplan-orm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="api/authenticator/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="anaplan-orm" class="md-nav__button md-logo" aria-label="anaplan-orm" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    anaplan-orm
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/valdal14/anaplan-orm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🌟 Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔐 Authentication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔐 Authentication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-basic-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Basic Authentication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-certificate-based-authentication-enterprise-standard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Certificate-Based Authentication (Enterprise Standard)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start-xml-parsing-data-upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Quick Start: XML Parsing &amp; Data Upload
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Quick Start: XML Parsing &amp; Data Upload">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-define-your-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Define Your Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-parse-serialize-and-upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Parse, Serialize, and Upload
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upload-strategies-which-one-should-i-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📤 Upload Strategies (Which one should I use?)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📤 Upload Strategies (Which one should I use?)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-the-fast-path-upload_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The Fast Path (upload_file)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-the-heavy-lifter-upload_file_chunked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Heavy Lifter (upload_file_chunked)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-the-turbocharger-upload_file_chunked_async" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The Turbocharger (upload_file_chunked_async) 🚀
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-the-infinite-streamer-upload_file_streaming_async" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The Infinite Streamer (upload_file_streaming_async) 🌌
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#handling-massive-imports-polling-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⏱️ Handling Massive Imports (Polling Configuration)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-deeply-nested-xml-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🪆 Advanced: Deeply Nested XML Extraction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start-json-parsing-rest-apis-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📝 Quick Start: JSON Parsing (REST APIs &amp; Files)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📝 Quick Start: JSON Parsing (REST APIs &amp; Files)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-define-your-model_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Define Your Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-parse-and-upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Parse and Upload
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-deeply-nested-json-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced: Deeply Nested JSON Extraction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start-sql-databases-relational-data-to-anaplan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🫙 Quick Start: SQL Databases (Relational Data to Anaplan)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🫙 Quick Start: SQL Databases (Relational Data to Anaplan)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-execute-your-query-and-pass-the-cursor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Execute your query and pass the cursor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-anaplan-data-types-sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧰 Custom Anaplan Data Types (Sanitization)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-model-to-model-m2m-hub-spoke-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🕸️ Advanced: Model-to-Model (M2M) Hub &amp; Spoke Pipelines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#download-strategies-extracting-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⬇️ Download Strategies (Extracting Data)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⬇️ Download Strategies (Extracting Data)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-the-in-memory-pull-download_file_chunked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The In-Memory Pull (download_file_chunked)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-the-infinite-streamer-download_file_streaming_async" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Infinite Streamer (download_file_streaming_async) 🌌
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-flight-processing-orm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧠 In-Flight Processing ORM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-where-does-anaplan-orm-sit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🗺️ Architecture: Where does anaplan-orm sit?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🗺️ Architecture: Where does anaplan-orm sit?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture-a-the-scheduled-pipeline-airflow-prefect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture A: The Scheduled Pipeline (Airflow / Prefect)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-b-the-serverless-event-stream-aws-lambda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture B: The Serverless Event Stream (AWS Lambda)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-c-the-massive-data-extract-data-lake" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture C: The Massive Data Extract (Data Lake)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing-to-anaplan-orm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🤝 Contributing to anaplan-orm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🤝 Contributing to anaplan-orm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-local-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Local Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-formatting-linting-ruff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Formatting &amp; Linting (Ruff)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-running-tests-pytest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Running Tests (Pytest)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-the-pull-request-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The Pull Request Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/authenticator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authenticator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/parsers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parsers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="anaplan-orm">anaplan-orm</h1>
+<p><img alt="CI Pipeline" src="https://github.com/valdal14/anaplan-orm/actions/workflows/ci.yml/badge.svg" />
+<a href="https://valdal14.github.io/anaplan-orm/"><img alt="Documentation" src="https://img.shields.io/badge/docs-MkDocs-blue.svg" /></a>
+<img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-blue?style=flat&amp;logo=python" />
+<img alt="License" src="https://img.shields.io/badge/License-MIT-green" /></p>
+<p>A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).</p>
+<hr />
+<h2 id="features">🌟 Features</h2>
+<ul>
+<li><strong>Pydantic Data Ingestion:</strong> Validates and maps Python objects to Anaplan models effortlessly.</li>
+<li><strong>Custom Anaplan Types:</strong> Built-in <code>AnaplanDate</code> and <code>AnaplanBoolean</code> automatically sanitize and strictly format Python native types into the exact string formats required by Anaplan's API.</li>
+<li><strong>Enterprise Security:</strong> Supports standard Basic Authentication and Anaplan's proprietary RSA-SHA512 Certificate-based Authentication (mTLS).</li>
+<li><strong>Resilient Networking:</strong> Built-in exponential backoff, automated retries to protect against dropped packets, and mid-flight token refreshing.</li>
+<li><strong>Massive Payloads:</strong> Automatically handles chunked file uploads for multi-megabyte/gigabyte datasets.</li>
+<li><strong>Infinite Disk Streaming:</strong> Utilizes <code>aiofiles</code> to stream multi-gigabyte files directly to/from Anaplan with a flat, near-zero memory footprint.</li>
+<li><strong>Hub-and-Spoke Orchestration (M2M):</strong> Seamlessly trigger and monitor internal Anaplan data flows from Data Hubs directly into destination Spoke Models.</li>
+<li><strong>Smart Polling:</strong> Asynchronous process execution with configurable, patient polling for long-running database transactions.</li>
+</ul>
+<hr />
+<h2 id="authentication">🔐 Authentication</h2>
+<p><code>anaplan-orm</code> uses a decoupled authentication strategy, allowing you to easily swap between development and production security standards.</p>
+<h3 id="1-basic-authentication">1. Basic Authentication</h3>
+<p>Ideal for development and sandbox testing.</p>
+<pre><code class="language-python">from anaplan_orm.client import AnaplanClient
+from anaplan_orm.authenticator import BasicAuthenticator
+
+auth = BasicAuthenticator(&quot;your_email@company.com&quot;, &quot;your_password&quot;)
+client = AnaplanClient(authenticator=auth)
+</code></pre>
+<h3 id="2-certificate-based-authentication-enterprise-standard">2. Certificate-Based Authentication (Enterprise Standard)</h3>
+<p>For production environments, Anaplan requires a custom RSA-SHA512 signature. The CertificateAuthenticator handles this cryptographic handshake automatically.</p>
+<p>Note: The library expects a .pem file containing both your private key and public certificate. If your enterprise issues a .p12 keystore, you can extract it using your terminal:</p>
+<pre><code class="language-bash">openssl pkcs12 -in keystore.p12 -out certificate.pem
+</code></pre>
+<pre><code class="language-python">from anaplan_orm.client import AnaplanClient
+from anaplan_orm.authenticator import CertificateAuthenticator
+
+# 1. Initialize the Certificate Authenticator
+auth = CertificateAuthenticator(
+    cert_path=&quot;path/to/your/certificate.pem&quot;,
+    # Omit if your private key is unencrypted
+    cert_password=&quot;your_secure_password&quot;, 
+    # Set to False if you need to bypass a corporate proxy
+    verify_ssl=True
+)
+
+# 2. Inject it into the Anaplan Client
+client = AnaplanClient(authenticator=auth)
+
+# 3. Execute a request
+status = client.ping()
+</code></pre>
+<hr />
+<h2 id="quick-start-xml-parsing-data-upload">📊 Quick Start: XML Parsing &amp; Data Upload</h2>
+<p>The <code>anaplan-orm</code> is designed to take raw XML strings (e.g., from MuleSoft or data pipeline payloads), validate them into Python objects, and stream them directly into Anaplan.</p>
+<h3 id="1-define-your-model">1. Define Your Model</h3>
+<p>Map your Anaplan target columns to Python using Pydantic fields. The <code>alias</code> parameter bridges the gap between external uppercase XML tags and internal Python <code>snake_case</code> variables. </p>
+<pre><code class="language-python">from pydantic import Field
+from anaplan_orm.models import AnaplanModel
+
+class Developer(AnaplanModel):
+    dev_id: int = Field(alias=&quot;DEV_ID&quot;)
+    dev_name: str = Field(alias=&quot;DEV_NAME&quot;)
+    dev_age: int = Field(alias=&quot;DEV_AGE&quot;)
+    dev_location: str = Field(alias=&quot;DEV_LOCATION&quot;)
+</code></pre>
+<h3 id="2-parse-serialize-and-upload">2. Parse, Serialize, and Upload</h3>
+<p>Use the XMLStringParser to ingest your XML string payload, then use the AnaplanClient to stream the chunked data to Anaplan.</p>
+<pre><code class="language-python">from anaplan_orm.parsers import XMLStringParser
+from anaplan_orm.client import AnaplanClient, BasicAuthenticator
+
+# 1. Your incoming XML string payload
+xml_string = &quot;&quot;&quot;
+&lt;AnaplanExport&gt;
+    &lt;Row&gt;
+        &lt;DEV_ID&gt;1001&lt;/DEV_ID&gt;
+        &lt;DEV_NAME&gt;Ada Lovelace&lt;/DEV_NAME&gt;
+        &lt;DEV_AGE&gt;36&lt;/DEV_AGE&gt;
+        &lt;DEV_LOCATION&gt;London&lt;/DEV_LOCATION&gt;
+    &lt;/Row&gt;
+&lt;/AnaplanExport&gt;
+&quot;&quot;&quot;
+
+def run_pipeline():
+    # 2. Parse and Validate the data using the ORM
+    parser = XMLStringParser()
+    developers = Developer.from_payload(payload=xml_string, parser=parser)
+
+    # 3. Serialize to Anaplan-ready CSV (using a Pipe separator)
+    csv_data = Developer.to_csv(developers, separator=&quot;|&quot;)
+
+    # 4. Authenticate with Anaplan
+    auth = BasicAuthenticator(
+        email=&quot;ANAPLAN_EMAIL&quot;, 
+        pwd=&quot;ANAPLAN_PASSWORD&quot;
+    )
+
+    client = AnaplanClient(authenticator=auth)
+
+    # 5. Stream the file chunks safely
+    client.upload_file_chunked(
+        workspace_id=&quot;YOUR_WORKSPACE_ID&quot;, 
+        model_id=&quot;YOUR_MODEL_ID&quot;, 
+        file_id=&quot;YOUR_FILE_ID&quot;, 
+        csv_data=csv_data,
+        chunk_size_mb=10
+    )
+
+    # 6. Execute the Import Process
+    task_id = client.execute_process(
+        workspace_id=&quot;YOUR_WORKSPACE_ID&quot;, 
+        model_id=&quot;YOUR_MODEL_ID&quot;, 
+        process_id=&quot;YOUR_PROCESS_ID&quot;
+    )
+
+    # 7. Actively poll the database for success/failure
+    status = client.wait_for_process_completion(
+        workspace_id=&quot;YOUR_WORKSPACE_ID&quot;, 
+        model_id=&quot;YOUR_MODEL_ID&quot;, 
+        process_id=&quot;YOUR_PROCESS_ID&quot;, 
+        task_id=task_id
+    )
+
+if __name__ == &quot;__main__&quot;:
+    run_pipeline()
+</code></pre>
+<hr />
+<h2 id="upload-strategies-which-one-should-i-use">📤 Upload Strategies (Which one should I use?)</h2>
+<p><code>anaplan-orm</code> provides four distinct methods for streaming data into Anaplan. Whether you are uploading a tiny configuration table or a 10-Gigabyte daily transaction ledger, there is a method optimized for your pipeline.</p>
+<h3 id="1-the-fast-path-upload_file">1. The Fast Path (upload_file)</h3>
+<p><strong>Best for:</strong> Small datasets, dimension updates, or configuration files (<strong>&lt; 10 MB</strong>).
+<strong>How it works:</strong> Executes a single, synchronous <code>PUT</code> request. It has zero overhead and is the absolute fastest way to get small amounts of data into Anaplan.</p>
+<pre><code class="language-python"># Uploads the entire CSV in one shot
+client.upload_file(
+    workspace_id=&quot;YOUR_WORKSPACE_ID&quot;, 
+    model_id=&quot;YOUR_MODEL_ID&quot;, 
+    file_id=&quot;YOUR_FILE_ID&quot;, 
+    csv_data=csv_data
+)
+</code></pre>
+<h3 id="2-the-heavy-lifter-upload_file_chunked">2. The Heavy Lifter (upload_file_chunked)</h3>
+<p><strong>Best for:</strong> Medium-to-Large datasets (10 MB - 100 MB) or pipelines running in strictly synchronous environments.
+<strong>How it works:</strong> Synchronously splits your CSV string into pieces (chunks) and uploads them one by one. This bypasses Anaplan's single-request timeout limits and guarantees safe delivery over unstable networks by retrying failed chunks individually.</p>
+<pre><code class="language-python"># Uploads sequentially, one 10MB chunk at a time
+client.upload_file_chunked(
+    workspace_id=&quot;YOUR_WORKSPACE_ID&quot;, 
+    model_id=&quot;YOUR_MODEL_ID&quot;, 
+    file_id=&quot;YOUR_FILE_ID&quot;, 
+    csv_data=csv_data,
+    chunk_size_mb=10 
+)
+</code></pre>
+<h3 id="3-the-turbocharger-upload_file_chunked_async">3. The Turbocharger (upload_file_chunked_async) 🚀</h3>
+<p><strong>Best for:</strong> Large Datasets already stored in memory (100 MB - 500 MB).
+<strong>How it works:</strong> Utilizes Python's asyncio to blast multiple file chunks to the Anaplan server simultaneously from a loaded Python string. It includes a built-in Semaphore (default: 5 concurrent connections) to completely saturate your network bandwidth without triggering Anaplan's 429 Too Many Requests rate limits.</p>
+<p><em>Note: For files larger than 500MB, we recommend increasing the <code>chunk_size_mb</code> to 25 or 50 to reduce HTTP overhead. As per the <a href="https://help.anaplan.com/upload-a-text-or-csv-file-db641832-285c-41f7-a2e3-459859cb065e">Official Anaplan API Documentation</a>, the permitted data chunk size is strictly "between 1 to 50 MB".</em></p>
+<pre><code class="language-python">import asyncio
+from anaplan_orm.client import AnaplanClient
+
+async def fast_upload_pipeline():
+    # Initialize your client
+    client = AnaplanClient(authenticator=auth)
+
+    # Await the async upload
+    await client.upload_file_chunked_async(
+        workspace_id=&quot;YOUR_WORKSPACE_ID&quot;, 
+        model_id=&quot;YOUR_MODEL_ID&quot;, 
+        file_id=&quot;YOUR_FILE_ID&quot;, 
+        csv_data=gigantic_csv_string,
+         # Slice the file into 25MB pieces
+        chunk_size_mb=25,
+        # Upload 5 pieces at the exact same time            
+        max_concurrent_uploads=5      
+    )
+
+# Execute the async event loop
+asyncio.run(fast_upload_pipeline())
+</code></pre>
+<h3 id="4-the-infinite-streamer-upload_file_streaming_async">4. The Infinite Streamer (upload_file_streaming_async) 🌌</h3>
+<p><strong>Best for:</strong> Massive Enterprise Datasets (500 MB to 10+ Gigabytes) or memory-constrained environments (like small AWS Lambda functions or Docker containers).
+<strong>How it works:</strong> Instead of requiring the data to be in memory, this method takes a file_path. It uses aiofiles and a bounded Producer-Consumer queue to read the file directly from your hard drive in small chunks, piping them concurrently to Anaplan. Memory usage stays completely flat (typically under 150MB) regardless of file size, entirely eliminating Out Of Memory (OOM) crashes.</p>
+<pre><code class="language-python">import asyncio
+from anaplan_orm.client import AnaplanClient
+
+async def infinite_streaming_pipeline():
+    client = AnaplanClient(authenticator=auth)
+
+    # Pass a local file path instead of a string
+    await client.upload_file_streaming_async(
+        workspace_id=&quot;YOUR_WORKSPACE_ID&quot;, 
+        model_id=&quot;YOUR_MODEL_ID&quot;, 
+        file_id=&quot;YOUR_FILE_ID&quot;, 
+        file_path=&quot;path/to/massive_export.csv&quot;, 
+        # Slice the file into 25MB pieces
+        chunk_size_mb=25,
+        # Upload 5 pieces at the exact same time          
+        max_concurrent_uploads=5      
+    )
+
+asyncio.run(infinite_streaming_pipeline())
+</code></pre>
+<hr />
+<h2 id="handling-massive-imports-polling-configuration">⏱️ Handling Massive Imports (Polling Configuration)</h2>
+<p>When you trigger an Anaplan process (<code>execute_process</code>), Anaplan processes the data asynchronously on its own servers. Your script must actively poll the API to know when the job finishes. </p>
+<p>For small files, the default polling limits are fine. However, <strong>for massive datasets (100MB+), Anaplan may take several minutes to ingest the data.</strong> You must adjust the <code>retry</code> and <code>poll_interval</code> parameters to give Anaplan enough time to finish without your Python script timing out.</p>
+<pre><code class="language-python"># Start the import process
+task_id = client.execute_process(WORKSPACE_ID, MODEL_ID, PROCESS_ID)
+
+# For a 500MB+ file, configure a patient polling strategy
+# Example: 120 retries * 10 seconds = 20 minutes maximum wait time
+status = client.wait_for_process_completion(
+    workspace_id=WORKSPACE_ID, 
+    model_id=MODEL_ID, 
+    process_id=PROCESS_ID, 
+    task_id=task_id,
+    # Increase the number of checks
+    retry=120,    
+    # Wait 10 seconds between each check
+    poll_interval=10
+)
+</code></pre>
+<hr />
+<h2 id="advanced-deeply-nested-xml-extraction">🪆 Advanced: Deeply Nested XML Extraction</h2>
+<p>If your XML payload is deeply nested or relies heavily on attributes (common with SOAP APIs), you can use Pydantic's json_schema_extra to define native XPath 1.0 mappings. The parser will automatically evaluate the XPath, extract both text nodes and attributes, and map them to your Anaplan aliases.</p>
+<pre><code class="language-python">from pydantic import Field
+from anaplan_orm.models import AnaplanModel
+
+class NestedXMLDeveloper(AnaplanModel):
+    # Use '@' to extract attributes
+    # Use '/' to navigate nested text nodes
+    dev_id: int = Field(
+        alias=&quot;DEV_ID&quot;, 
+        json_schema_extra={&quot;path&quot;: &quot;./EmployeeDetails/@empId&quot;} 
+    )
+    dev_name: str = Field(
+        alias=&quot;DEV_NAME&quot;, 
+        json_schema_extra={&quot;path&quot;: &quot;./EmployeeDetails/Profile/FullName&quot;} 
+    )
+</code></pre>
+<p>To extract the repeating rows from the document, simply pass the base XPath expression to the parser using the data_key argument:</p>
+<pre><code class="language-python">from anaplan_orm.parsers import XMLStringParser
+
+# The parser will find every &lt;Employee&gt; node, and apply your XPath mappings to it!
+developers = NestedXMLDeveloper.from_payload(
+    payload=raw_xml_string, 
+    parser=XMLStringParser(), 
+    data_key=&quot;.//Employee&quot; 
+)
+</code></pre>
+<p>Below you can see the XML example used for the above example</p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;EnterpriseExport status=&quot;success&quot; timestamp=&quot;2026-03-16T08:00:00Z&quot;&gt;
+    &lt;EmployeeRecords&gt;
+        &lt;Employee status=&quot;active&quot;&gt;
+            &lt;EmployeeDetails empId=&quot;1001&quot;&gt;
+                &lt;Profile&gt;
+                    &lt;FullName&gt;Ada Lovelace&lt;/FullName&gt;
+                    &lt;Age&gt;36&lt;/Age&gt;
+                &lt;/Profile&gt;
+            &lt;/EmployeeDetails&gt;
+            &lt;Office&gt;
+                &lt;City&gt;London&lt;/City&gt;
+                &lt;Region&gt;EMEA&lt;/Region&gt;
+            &lt;/Office&gt;
+        &lt;/Employee&gt;
+        &lt;Employee status=&quot;active&quot;&gt;
+            &lt;EmployeeDetails empId=&quot;1002&quot;&gt;
+                &lt;Profile&gt;
+                    &lt;FullName&gt;Grace Hopper&lt;/FullName&gt;
+                    &lt;Age&gt;85&lt;/Age&gt;
+                &lt;/Profile&gt;
+            &lt;/EmployeeDetails&gt;
+            &lt;Office&gt;
+                &lt;City&gt;New York&lt;/City&gt;
+                &lt;Region&gt;NAMER&lt;/Region&gt;
+            &lt;/Office&gt;
+        &lt;/Employee&gt;
+    &lt;/EmployeeRecords&gt;
+&lt;/EnterpriseExport&gt;
+</code></pre>
+<hr />
+<h2 id="quick-start-json-parsing-rest-apis-files">📝 Quick Start: JSON Parsing (REST APIs &amp; Files)</h2>
+<p>For modern web integrations or local file processing, <code>anaplan-orm</code> provides a native <code>JSONParser</code>. It gracefully handles both flat JSON arrays and nested API responses by allowing you to pass targeted extraction keys directly through your Pydantic model.</p>
+<h3 id="1-define-your-model_1">1. Define Your Model</h3>
+<pre><code class="language-python">from pydantic import Field
+from anaplan_orm.models import AnaplanModel
+
+class Employee(AnaplanModel):
+    emp_id: int = Field(alias=&quot;id&quot;)
+    email: str = Field(alias=&quot;emailAddress&quot;)
+    department: str = Field(alias=&quot;dept&quot;)
+</code></pre>
+<h3 id="2-parse-and-upload">2. Parse and Upload</h3>
+<p>If your JSON data is nested inside a metadata wrapper: I.E: </p>
+<pre><code class="language-json">{&quot;status&quot;: &quot;success&quot;, &quot;data&quot;: [...] }
+</code></pre>
+<p>Simply pass the data_key argument to the from_payload method. The ORM will safely drill down, extract the records, and inflate your models.</p>
+<pre><code class="language-python">import httpx
+from anaplan_orm.parsers import JSONParser
+
+# 1. Fetch JSON from an external REST API (or read a local .json file)
+api_response = httpx.get(&quot;https://api.mycompany.com/v1/employees&quot;).text
+
+# 2. Parse the JSON string (drilling into the &quot;data&quot; array)
+parser = JSONParser()
+employees = Employee.from_payload(
+    payload=api_response, 
+    parser=parser, 
+    # The ORM passes this key directly to the parser.
+    data_key=&quot;data&quot; 
+)
+
+# 3. Convert to Anaplan CSV and Upload
+csv_data = Employee.to_csv(employees)
+client.upload_file_chunked(WORKSPACE_ID, MODEL_ID, FILE_ID, csv_data)
+</code></pre>
+<hr />
+<h3 id="advanced-deeply-nested-json-extraction">Advanced: Deeply Nested JSON Extraction</h3>
+<p>If your API returns a deeply nested JSON response, you do not need to write custom flattening loops. Simply use Pydantic's <code>json_schema_extra</code> to define a <a href="https://jmespath.org/">JMESPath</a> mapping. The ORM will automatically traverse the JSON tree, extract the value, and assign it to the correct Anaplan column (<code>alias</code>).</p>
+<pre><code class="language-python">from pydantic import Field
+from anaplan_orm.models import AnaplanModel
+
+class NestedEmployee(AnaplanModel):
+    # 'alias' is the Anaplan CSV column's name. 
+    # 'path' is where to find the data in the JSON.
+    emp_id: int = Field(
+        alias=&quot;DEV_ID&quot;, 
+        json_schema_extra={&quot;path&quot;: &quot;employeeDetails.empId&quot;}
+    )
+    city: str = Field(
+        alias=&quot;LOCATION&quot;, 
+        json_schema_extra={&quot;path&quot;: &quot;office.address.city&quot;}
+    )
+</code></pre>
+<hr />
+<h2 id="quick-start-sql-databases-relational-data-to-anaplan">🫙 Quick Start: SQL Databases (Relational Data to Anaplan)</h2>
+<p>If your source data lives in a relational database (Snowflake, PostgreSQL, SQL Server), <code>anaplan-orm</code> provides an <code>SQLCursorParser</code>. This allows you to stream live database queries directly into Pydantic models without ever saving a CSV to disk.</p>
+<h3 id="1-execute-your-query-and-pass-the-cursor">1. Execute your query and pass the cursor</h3>
+<p>The parser accepts any standard DB-API 2.0 cursor object, dynamically extracts the column headers, and maps them to your model <code>aliases</code>.</p>
+<pre><code class="language-python">import psycopg2 # Or sqlite3, snowflake.connector, etc.
+from anaplan_orm.parsers import SQLCursorParser
+
+# 1. Connect to your database and execute a query
+conn = psycopg2.connect(&quot;dbname=enterprise user=admin password=secret&quot;)
+cursor = conn.cursor()
+cursor.execute(&quot;SELECT emp_id AS id, email_address, department FROM employees WHERE active = true&quot;)
+
+# 2. Pass the active cursor directly into the ORM
+employees = Employee.from_payload(
+    payload=cursor, 
+    parser=SQLCursorParser()
+)
+
+# 3. Convert to Anaplan CSV and Upload
+csv_data = Employee.to_csv(employees)
+client.upload_file_chunked(WORKSPACE_ID, MODEL_ID, FILE_ID, csv_data)
+
+conn.close()
+</code></pre>
+<hr />
+<h2 id="custom-anaplan-data-types-sanitization">🧰 Custom Anaplan Data Types (Sanitization)</h2>
+<p>The Anaplan API is notoriously strict about data formats during imports. A standard Python <code>datetime</code> object or a boolean <code>True</code> will cause a silent rejection if Anaplan expects <code>"YYYY-MM-DD"</code> or <code>"true"</code>. </p>
+<p><code>anaplan-orm</code> provides custom Pydantic types that act as an automatic translation layer. They accept highly flexible Python inputs and strictly serialize them for Anaplan.</p>
+<pre><code class="language-python">from datetime import date
+from pydantic import BaseModel
+from anaplan_orm.types import AnaplanDate, AnaplanBoolean
+
+class EmployeeRow(BaseModel):
+    emp_id: int
+    is_active: AnaplanBoolean
+    start_date: AnaplanDate
+
+# The ORM is highly forgiving with inputs:
+row_1 = EmployeeRow(emp_id=1, is_active=&quot;Yes&quot;, start_date=&quot;2026-03-19&quot;)
+row_2 = EmployeeRow(emp_id=2, is_active=True, start_date=date(2026, 4, 12))
+
+# But it strictly serializes for the Anaplan API:
+print(row_1.model_dump()) 
+# {'emp_id': 1, 'is_active': 'true', 'start_date': '2026-03-19'}
+
+print(row_2.model_dump())
+# {'emp_id': 2, 'is_active': 'true', 'start_date': '2026-04-12'}
+</code></pre>
+<hr />
+<h2 id="advanced-model-to-model-m2m-hub-spoke-pipelines">🕸️ Advanced: Model-to-Model (M2M) Hub &amp; Spoke Pipelines</h2>
+<p>In enterprise deployments, it is best practice to load raw CSV data into a centralized <strong>Data Hub Model</strong>, run validation checks, and then push that clean data out to localized <strong>Spoke Models</strong> (like FP&amp;A or Supply Chain) using an Anaplan Model-to-Model (M2M) process.</p>
+<p><code>anaplan-orm</code> natively supports orchestrating this complex 3-step architecture using the same robust execution engine.</p>
+<blockquote>
+<p><strong>Crucial Rule for M2M:</strong> While the data flows <em>from</em> the Hub, Anaplan requires you to trigger the M2M process using the <strong>Destination Model's ID</strong>.</p>
+</blockquote>
+<pre><code class="language-python">import asyncio
+from anaplan_orm.authenticator import CertificateAuthenticator
+from anaplan_orm.client import AnaplanClient
+
+async def enterprise_m2m_pipeline():
+    auth = CertificateAuthenticator(
+        cert_path=&quot;your_cert.pem&quot;, 
+        cert_password=&quot;your_anaplanCertPassword&quot;
+    )
+    client = AnaplanClient(authenticator=auth)
+
+    # 1. Stream the massive CSV directly from disk to the Data Hub
+    await client.upload_file_streaming_async(
+        workspace_id=HUB_WS,
+        model_id=HUB_MODEL,
+        file_id=HUB_FILE,
+        file_path=&quot;massive_daily_report.csv&quot;
+    )
+
+    # 2. Trigger the Data Hub to ingest the uploaded file
+    hub_task = client.execute_process(HUB_WS, HUB_MODEL, HUB_PROCESS)
+    client.wait_for_process_completion(HUB_WS, HUB_MODEL, HUB_PROCESS, hub_task)
+
+    # 3. Trigger the Destination Spoke Model to pull the data from the Hub
+    m2m_task = client.execute_process(DEST_WS, DEST_MODEL, M2M_PROCESS)
+    client.wait_for_process_completion(DEST_WS, DEST_MODEL, M2M_PROCESS, m2m_task)
+
+asyncio.run(enterprise_m2m_pipeline())
+</code></pre>
+<hr />
+<h2 id="download-strategies-extracting-data">⬇️ Download Strategies (Extracting Data)</h2>
+<p><code>anaplan-orm</code> provides two distinct architectural patterns for extracting data out of Anaplan, plus a powerful parsing engine to transform that data on the fly.</p>
+<h3 id="1-the-in-memory-pull-download_file_chunked">1. The In-Memory Pull (<code>download_file_chunked</code>)</h3>
+<p><strong>Best for:</strong> Small to Medium datasets (<strong>&lt; 50 MB</strong>) or Dimension tables.
+<strong>How it works:</strong> Downloads all chunks and concatenates them into a single Python string in your server's RAM. </p>
+<pre><code class="language-python"># 1. Trigger export and wait
+task_id = client.execute_export(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
+client.wait_for_export_completion(WORKSPACE_ID, MODEL_ID, EXPORT_ID, task_id)
+
+# 2. Download the entire file into memory as a string
+raw_csv_string = client.download_file_chunked(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
+
+# 3. Write directly to a file (or upload to AWS S3 using boto3 for instance)
+with open(&quot;anaplan_export.csv&quot;, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
+    f.write(raw_csv_string)
+</code></pre>
+<h3 id="2-the-infinite-streamer-download_file_streaming_async">2. The Infinite Streamer (download_file_streaming_async) 🌌</h3>
+<p><strong>Best for:</strong> Massive Enterprise Datasets (100 MB to 10+ Gigabytes) or strictly memory-constrained environments (like AWS Lambda or Docker containers).
+<strong>How it works:</strong> Acts as an Asynchronous Generator. It safely buffers Anaplan's network chunks and yields the data row-by-row. Your server never holds more than a single chunk in memory at any given time, completely eliminating Out of Memory (OOM) crashes.
+<strong>Enterprise Use Cases:</strong> Writing massive historical ledgers to a local hard drive, or streaming data directly into an AWS S3 multipart_upload without saving the file locally.</p>
+<pre><code class="language-python">import asyncio
+import aiofiles
+from anaplan_orm.client import AnaplanClient
+
+async def massive_download_pipeline():
+    client = AnaplanClient(authenticator=auth)
+    task_id = client.execute_export(WORKSPACE_ID, MODEL_ID, EXPORT_ID)
+    client.wait_for_export_completion(WORKSPACE_ID, MODEL_ID, EXPORT_ID, task_id)
+
+    # Stream from Anaplan directly to the local disk, row by row!
+    async with aiofiles.open(&quot;massive_export.csv&quot;, mode=&quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
+        async for line in client.download_file_streaming_async(WORKSPACE_ID, MODEL_ID, EXPORT_ID):
+            await f.write(line)
+
+asyncio.run(massive_download_pipeline())
+</code></pre>
+<hr />
+<h2 id="in-flight-processing-orm">🧠 In-Flight Processing ORM</h2>
+<p>Regardless of how you download the data, if you need to validate data types, perform cross-column mathematical transformations, or mask sensitive PII before routing the data to another microservice, you can seamlessly inflate the CSV into strongly-typed Pydantic models.</p>
+<pre><code class="language-python">from pydantic import BaseModel, Field, ValidationError
+from anaplan_orm.parsers import CSVStringParser
+
+# 1. Define your strict data contract
+class FinancialRow(BaseModel):
+    cost_center: str = Field(alias=&quot;Cost Center&quot;)
+    outlook_eur: float = Field(alias=&quot;Outlook in Local Currency&quot;)
+
+# 2. Parse the raw CSV string (from `download_file_chunked`) into a list of dictionaries
+parsed_rows = CSVStringParser.parse(raw_csv_string)
+
+# 3. Inflate and validate the Pydantic models
+valid_models = []
+for row in parsed_rows:
+    try:
+        valid_models.append(FinancialRow(**row))
+    except ValidationError as e:
+        print(f&quot;Quarantined invalid row: {e}&quot;)
+
+# 4. Perform mathematically safe transformations 
+for model in valid_models:
+    model.outlook_eur = model.outlook_eur * 1.05
+</code></pre>
+<hr />
+<h2 id="architecture-where-does-anaplan-orm-sit">🗺️ Architecture: Where does <code>anaplan-orm</code> sit?</h2>
+<p><code>anaplan-orm</code> is designed to be the strongly-typed "bridge" between your modern data orchestrators and the Anaplan API. It operates in both schedule-driven batch processes and event-driven serverless architectures.</p>
+<h3 id="architecture-a-the-scheduled-pipeline-airflow-prefect">Architecture A: The Scheduled Pipeline (Airflow / Prefect)</h3>
+<p>In a traditional ELT pipeline, orchestrators trigger a Python worker to query a database. <code>anaplan-orm</code> strictly validates that SQL data in-memory and streams it to Anaplan.</p>
+<pre><code class="language-mermaid">graph TD
+    A[Apache Airflow] --&gt;|1. Triggers DAG| B[Python Worker]
+    B --&gt;|2. Query Data| C[(PostgreSQL / Snowflake)]
+    C -.-&gt;|3. SQLCursorParser| D{anaplan-orm: Pydantic Validation}
+    D --&gt;|4. upload_file_streaming_async| E[(Anaplan Model)]
+
+    style A fill:#017cee,stroke:#000,stroke-width:2px,color:#fff
+    style D fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
+    style E fill:#005bea,stroke:#000,stroke-width:2px,color:#fff
+</code></pre>
+<h3 id="architecture-b-the-serverless-event-stream-aws-lambda">Architecture B: The Serverless Event Stream (AWS Lambda)</h3>
+<p>For real-time integrations, external systems drop JSON/XML payloads into a message queue. A serverless function picks up the payload, and <code>anaplan-orm</code> handles the validation and chunked upload without ever touching a hard drive.</p>
+<pre><code class="language-mermaid">graph TD
+    A[Salesforce / Webhook] --&gt;|1. JSON Payload| B[AWS SQS / EventBridge]
+    B --&gt;|2. Triggers| C[AWS Lambda]
+    C -.-&gt;|3. JSONParser| D{anaplan-orm: Data Hydration}
+    D --&gt;|4. upload_file_chunked_async| E[(Anaplan)]
+
+    style A fill:#ff9900,stroke:#000,stroke-width:2px,color:#fff
+    style C fill:#ff4f00,stroke:#000,stroke-width:2px,color:#fff
+    style D fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
+</code></pre>
+<h3 id="architecture-c-the-massive-data-extract-data-lake">Architecture C: The Massive Data Extract (Data Lake)</h3>
+<p>When backing up Anaplan models or feeding downstream BI tools, <code>anaplan-orm</code> acts as a memory-safe conduit, streaming multi-gigabyte files row-by-row directly into cloud storage.</p>
+<pre><code class="language-mermaid">graph LR
+    A[(Anaplan)] --&gt;|1. download_file_streaming_async| B{anaplan-orm: Async Generator}
+    B --&gt;|2. async for row in stream:| C[(AWS S3 / Azure Blob)]
+
+    style A fill:#005bea,stroke:#000,stroke-width:2px,color:#fff
+    style B fill:#2e8555,stroke:#000,stroke-width:2px,color:#fff
+    style C fill:#527fff,stroke:#000,stroke-width:2px,color:#fff
+</code></pre>
+<hr />
+<h2 id="contributing-to-anaplan-orm">🤝 Contributing to anaplan-orm</h2>
+<p>We welcome contributions! To maintain enterprise-grade code quality, this project uses strict formatting, linting, and testing pipelines.</p>
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+<li><strong>Python 3.10+</strong></li>
+<li><strong>Poetry</strong> (Dependency management)</li>
+</ul>
+<h3 id="1-local-setup">1. Local Setup</h3>
+<p>Clone the repository and install all dependencies (including the <code>dev</code> group tools like Pytest and Ruff):</p>
+<pre><code class="language-bash">git clone https://github.com/valdal14/anaplan-orm.git
+cd anaplan-orm
+poetry install
+</code></pre>
+<h3 id="2-formatting-linting-ruff">2. Formatting &amp; Linting (Ruff)</h3>
+<p>This project enforces strict PEP 8 compliance using <strong>Ruff</strong>. Before submitting any code, you must format and lint your changes. If you do not run these commands, the GitHub Actions CI pipeline will fail your Pull Request.</p>
+<p>Run the formatter to automatically fix spacing, quotes, and line breaks:</p>
+<pre><code class="language-bash">poetry run python3 -m ruff format .
+</code></pre>
+<p>Run the linter to catch unused imports, bad variables, and logical style issues:</p>
+<pre><code class="language-bash">poetry run python3 -m ruff check --fix .
+</code></pre>
+<p>(Tip: I highly recommend installing the Ruff extension in your IDE and setting it to "Format on Save").</p>
+<h3 id="3-running-tests-pytest">3. Running Tests (Pytest)</h3>
+<p>Every feature and bug fix must be covered by unit tests. The test suite heavily utilizes Python's unittest.mock to simulate Anaplan network responses without requiring live API credentials.</p>
+<p>Run the entire test suite:</p>
+<pre><code class="language-bash">poetry run python3 -m pytest
+</code></pre>
+<h3 id="4-the-pull-request-workflow">4. The Pull Request Workflow</h3>
+<ol>
+<li>Create a feature branch (e.g., feature/ORM-123-new-parser).</li>
+<li>Write your code and your tests.</li>
+<li>Run Ruff (format and check) and Pytest.</li>
+<li>Push your branch to GitHub and open a Pull Request against main.</li>
+<li>Wait for the automated CI pipeline to verify your build before merging.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.tabs", "navigation.sections", "toc.integrate", "search.suggest"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
