@@ -1,15 +1,11 @@
 # anaplan-orm
 
 ![CI Pipeline](https://github.com/valdal14/anaplan-orm/actions/workflows/ci.yml/badge.svg)
+[![Documentation](https://img.shields.io/badge/docs-MkDocs-blue.svg)](https://valdal14.github.io/anaplan-orm/)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat&logo=python)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 A lightweight Python 3 library that abstracts the Anaplan API into an Object-Relational Mapper (ORM).
-
-📖 **Official API Documentation:** [https://valdal14.github.io/anaplan-orm/](https://valdal14.github.io/anaplan-orm/)
-
-## 🚀 Current Status - **Stable (v1.0.0)**
-The core ingestion engine, async streaming clients, parsing utilities, and M2M orchestration are fully complete, production-certified, and thoroughly documented. `anaplan-orm` is officially ready for enterprise deployments.
 
 ---
 
@@ -26,7 +22,7 @@ The core ingestion engine, async streaming clients, parsing utilities, and M2M o
 ---
 
 ## 🛣️ Roadmap
-With the `v1.0.0` stable release and automated MkDocs API documentation deployed, `anaplan-orm` is currently focused on maintenance and advanced enterprise features.
+With the `v1.1.0` stable release and automated MkDocs API documentation deployed, `anaplan-orm` is currently focused on maintenance and advanced enterprise features.
 
 ### 🔮 Future Backlog (v1.x)
 * **Action Executions & Purges:** Dedicated wrappers for triggering Anaplan Delete Actions to dynamically truncate/clear staging modules prior to fresh data loads.
